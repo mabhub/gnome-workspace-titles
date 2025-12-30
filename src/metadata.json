@@ -1,0 +1,9 @@
+{
+  "name": "Gnome Workspace Titles",
+  "uuid": "gnome-workspace-titles@MahdadGhasemian.github.io",
+  "description": "Set and display custom names for your Ubuntu GNOME workspaces.",
+  "shell-version": ["46", "45"],
+  "url": "https://github.com/MahdadGhasemian/gnome-workspace-titles",
+  "settings-schema": "org.gnome.shell.extensions.gnome-workspace-titles",
+  "version": 10
+}

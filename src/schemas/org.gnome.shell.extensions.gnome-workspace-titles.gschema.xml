@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.gnome-workspace-titles"
+          path="/org/gnome/shell/extensions/gnome-workspace-titles/">
+
+    <key name="enable-custom-names" type="b">
+      <default>true</default>
+      <summary>Enable custom workspace names</summary>
+      <description>If true, the extension will display custom names from the workspace-names array instead of default Workspace N names.</description>
+    </key>
+
+    <key name="workspace-names" type="as">
+      <default>[]</default>
+      <summary>Custom workspace names</summary>
+      <description>Array of workspace names where index 0 corresponds to workspace 1, index 1 to workspace 2, etc.</description>
+    </key>
+
+  </schema>
+</schemalist>
