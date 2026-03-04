@@ -1,5 +1,6 @@
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
@@ -11,6 +12,9 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     enable() {
         // Use proper extension settings (schema)
         this._settings = this.getSettings();
+
+        // Access standard WM workspace-names setting
+        this._wmSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.wm.preferences' });
 
         // Create a panel button
         this._indicator = new PanelMenu.Button(0.0, this.metadata.name, false);
@@ -42,8 +46,11 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
             () => this._updateWorkspaceNumber()
         );
 
-        // update when settings change
+        // update when extension settings change
         this._settings.connect('changed', () => this._updateWorkspaceNumber());
+
+        // update when WM workspace-names change (e.g. from rename script)
+        this._wmSettingsSignal = this._wmSettings.connect('changed::workspace-names', () => this._updateWorkspaceNumber());
 
         // Make the indicator clickable
         this._indicator.connect('button-press-event', () => this._openRenamePopup());
@@ -63,6 +70,14 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
             this._indicator = null;
         }
 
+        if (this._wmSettings) {
+            if (this._wmSettingsSignal) {
+                this._wmSettings.disconnect(this._wmSettingsSignal);
+                this._wmSettingsSignal = null;
+            }
+            this._wmSettings = null;
+        }
+
         this._settings = null;
     }
 
@@ -75,7 +90,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     _getWorkspaceNames() {
-        return this._settings.get_strv('workspace-names');
+        return this._wmSettings.get_strv('workspace-names');
     }
 
     // Set the name for a specific workspace
@@ -88,7 +103,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         }
 
         names[index] = newName;
-        this._settings.set_strv('workspace-names', names);
+        this._wmSettings.set_strv('workspace-names', names);
     }
 
     _updateWorkspaceInitially() {
@@ -104,7 +119,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         const nWorkspaces = global.workspace_manager.n_workspaces;
         const defaultNames = Array.from({ length: nWorkspaces }, (_, i) => `Workspace ${i + 1}`);
 
-        this._settings.set_strv('workspace-names', defaultNames);
+        this._wmSettings.set_strv('workspace-names', defaultNames);
 
         this._workspaceLabel.set_text(`Workspace ${activeIndex + 1}`);
     }
@@ -153,7 +168,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
                 const currentNames = this._getWorkspaceNames();
                 if (currentNames[activeIndex]) {
                     currentNames[activeIndex] = '';
-                    this._settings.set_strv('workspace-names', currentNames);
+                    this._wmSettings.set_strv('workspace-names', currentNames);
                 }
             }
         }
