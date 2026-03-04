@@ -39,7 +39,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         Main.panel.addToStatusArea(this.uuid, this._indicator, panelPosition, panelBox);
 
         // Update the label initially
-        this._updateWorkspaceInitially();
         this._updateWorkspaceNumber();
 
         // Connect signal to update on workspace change
@@ -87,10 +86,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     // Helper methods
     // ───────────────────────────────────────────────
 
-    _shouldUseCustomNames() {
-        return this._settings.get_boolean('enable-custom-names');
-    }
-
     _getWorkspaceNames() {
         return this._wmSettings.get_strv('workspace-names');
     }
@@ -106,24 +101,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
 
         names[index] = newName;
         this._wmSettings.set_strv('workspace-names', names);
-    }
-
-    _updateWorkspaceInitially() {
-        const shouldUseCustomNames = this._shouldUseCustomNames();
-        const activeIndex = global.workspace_manager.get_active_workspace_index();
-
-        if (shouldUseCustomNames) {
-            this._updateWorkspaceNumber();
-            return;
-        }
-
-        // Reset all names to default when feature is disabled on startup
-        const nWorkspaces = global.workspace_manager.n_workspaces;
-        const defaultNames = Array.from({ length: nWorkspaces }, (_, i) => `Workspace ${i + 1}`);
-
-        this._wmSettings.set_strv('workspace-names', defaultNames);
-
-        this._workspaceLabel.set_text(`Workspace ${activeIndex + 1}`);
     }
 
     _updateWorkspaceNumber() {
@@ -144,22 +121,13 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         const activeIndex = global.workspace_manager.get_active_workspace_index();
         const names = this._getWorkspaceNames();
 
-        const currentName = this._shouldUseCustomNames()
-            ? (names[activeIndex]?.trim() || `Workspace ${activeIndex + 1}`)
-            : `Workspace ${activeIndex + 1}`;
+        const currentName = names[activeIndex]?.trim() || `Workspace ${activeIndex + 1}`;
 
-        const dialog = new InputDialog(
-            'Rename workspace:',
-            currentName,
-            'Use custom names after restart',
-            this._shouldUseCustomNames()
-        );
+        const dialog = new InputDialog('Rename workspace:', currentName);
 
         const result = await dialog.open();
 
         if (result !== null) {
-            this._settings.set_boolean('enable-custom-names', result.checked);
-
             const newName = result.text.trim();
 
             if (newName) {

@@ -5,7 +5,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 export const InputDialog = GObject.registerClass(
     class InputDialog extends St.BoxLayout {
-        _init(prompt, initialText = '', checkboxLabel = null, initialCheckboxState = false) {
+        _init(prompt, initialText = '') {
             super._init({
                 vertical: true,
                 style_class: 'input-dialog',
@@ -56,34 +56,6 @@ export const InputDialog = GObject.registerClass(
                 this.close(true);
             });
 
-            // Checkbox (only added if label is provided)
-            if (checkboxLabel) {
-                this._checkbox = new St.Button({
-                    label: checkboxLabel,
-                    toggle_mode: true,
-                    reactive: true,
-                    track_hover: true,
-                    style_class: 'input-dialog-checkbox',
-                    checked: initialCheckboxState
-                });
-
-                // Visual feedback for checked state
-                this._checkbox.connect('notify::checked', () => {
-                    if (this._checkbox.checked) {
-                        this._checkbox.add_style_pseudo_class('checked');
-                    } else {
-                        this._checkbox.remove_style_pseudo_class('checked');
-                    }
-                });
-
-                // Initial state
-                if (this._checkbox.checked) {
-                    this._checkbox.add_style_pseudo_class('checked');
-                }
-
-                this._dialogBox.add_child(this._checkbox);
-            }
-
             // Buttons
             const buttonBox = new St.BoxLayout({ style_class: 'input-dialog-buttons' });
             buttonBox.spacing = 10;
@@ -110,9 +82,6 @@ export const InputDialog = GObject.registerClass(
             buttonBox.add_child(okButton);
 
             this._dialogBox.add_child(this._entry);
-            if (this._checkbox) {
-                // Already added above, just ensure order
-            }
             this._dialogBox.add_child(buttonBox);
 
             this._overlay.add_child(this._dialogBox);
@@ -151,10 +120,7 @@ export const InputDialog = GObject.registerClass(
                 this._escapeEventId = null;
             }
 
-            const result = confirm ? {
-                text: this._entry.text.trim(),
-                checked: this._checkbox ? this._checkbox.checked : false
-            } : null;
+            const result = confirm ? { text: this._entry.text.trim() } : null;
 
             this._overlay.ease({
                 opacity: 0,
