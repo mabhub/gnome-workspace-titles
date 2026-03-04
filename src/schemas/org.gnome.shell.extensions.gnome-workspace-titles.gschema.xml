@@ -15,5 +15,17 @@
       <description>Array of workspace names where index 0 corresponds to workspace 1, index 1 to workspace 2, etc.</description>
     </key>
 
+    <key name="panel-box" type="s">
+      <default>'left'</default>
+      <summary>Panel box position</summary>
+      <description>Which panel box to place the indicator in: 'left', 'center', or 'right'.</description>
+    </key>
+
+    <key name="panel-position" type="i">
+      <default>0</default>
+      <summary>Position index in the panel box</summary>
+      <description>Index position within the chosen panel box (0 = start).</description>
+    </key>
+
   </schema>
 </schemalist>

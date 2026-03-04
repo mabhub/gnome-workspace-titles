@@ -34,7 +34,9 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         this._indicator.add_child(box);
 
         // Add the indicator to the panel
-        Main.panel.addToStatusArea(this.uuid, this._indicator);
+        const panelBox = this._settings.get_string('panel-box');
+        const panelPosition = this._settings.get_int('panel-position');
+        Main.panel.addToStatusArea(this.uuid, this._indicator, panelPosition, panelBox);
 
         // Update the label initially
         this._updateWorkspaceInitially();
