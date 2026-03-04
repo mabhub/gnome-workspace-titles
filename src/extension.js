@@ -1,12 +1,47 @@
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
+import GObject from 'gi://GObject';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
+import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 // Local import
 import { InputDialog } from './dialog.js';
+
+const WorkspaceIndicatorButton = GObject.registerClass(
+class WorkspaceIndicatorButton extends PanelMenu.Button {
+    /**
+     * @param {GnomeWorkspaceTitlesExtension} extension - Parent extension instance
+     */
+    _init(extension) {
+        super._init(0.0, extension.metadata.name, false);
+        this._ext = extension;
+    }
+
+    /**
+     * Dispatches pointer button events: left click opens the rename dialog,
+     * right click rebuilds and toggles the context menu.
+     * Middle click and other events are forwarded to the parent implementation.
+     * @param {Clutter.Event} event
+     * @returns {boolean} Clutter.EVENT_STOP or Clutter.EVENT_PROPAGATE
+     */
+    vfunc_event(event) {
+        if (event.type() === Clutter.EventType.BUTTON_PRESS) {
+            if (event.get_button() === Clutter.BUTTON_PRIMARY) {
+                this._ext._openRenamePopup();
+                return Clutter.EVENT_STOP;
+            }
+            if (event.get_button() === Clutter.BUTTON_SECONDARY) {
+                this._ext._rebuildContextMenu();
+                this.menu.toggle();
+                return Clutter.EVENT_STOP;
+            }
+        }
+        return super.vfunc_event(event);
+    }
+});
 
 export default class GnomeWorkspaceTitlesExtension extends Extension {
     enable() {
@@ -17,7 +52,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         this._wmSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.wm.preferences' });
 
         // Create a panel button
-        this._indicator = new PanelMenu.Button(0.0, this.metadata.name, false);
+        this._indicator = new WorkspaceIndicatorButton(this);
 
         // Create a horizontal box to hold icon + label
         const box = new St.BoxLayout({ style_class: 'workspace-indicator-box', vertical: false });
@@ -26,7 +61,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         this._workspaceLabel = new St.Label({
             text: '1',
             y_align: Clutter.ActorAlign.CENTER,
-            style_class: 'workspace-number-label'
+            style_class: 'workspace-number-label',
         });
         box.add_child(this._workspaceLabel);
 
@@ -52,9 +87,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
 
         // update when WM workspace-names change (e.g. from rename script)
         this._wmSettingsSignal = this._wmSettings.connect('changed::workspace-names', () => this._updateWorkspaceNumber());
-
-        // Make the indicator clickable
-        this._indicator.connect('button-press-event', () => this._openRenamePopup());
 
         console.debug("[GnomeWorkspaceTitlesExtension] Enabled");
     }
@@ -86,11 +118,19 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     // Helper methods
     // ───────────────────────────────────────────────
 
+    /**
+     * Returns the current workspace names array from WM settings.
+     * @returns {string[]}
+     */
     _getWorkspaceNames() {
         return this._wmSettings.get_strv('workspace-names');
     }
 
-    // Set the name for a specific workspace
+    /**
+     * Sets the name for a specific workspace index, padding the array if needed.
+     * @param {number} index - Zero-based workspace index
+     * @param {string} newName
+     */
     _setWorkspaceName(index, newName) {
         const names = this._getWorkspaceNames();
 
@@ -103,6 +143,21 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         this._wmSettings.set_strv('workspace-names', names);
     }
 
+    /**
+     * Returns a copy of the array with trailing empty strings removed.
+     * @param {string[]} names
+     * @returns {string[]}
+     */
+    _trimTrailingEmpty(names) {
+        let i = names.length - 1;
+        while (i >= 0 && names[i] === '') i--;
+        return names.slice(0, i + 1);
+    }
+
+    /**
+     * Updates the panel label to show the active workspace name,
+     * or a fallback "Workspace N" if no name is set.
+     */
     _updateWorkspaceNumber() {
         const activeIndex = global.workspace_manager.get_active_workspace_index();
         const names = this._getWorkspaceNames();
@@ -116,7 +171,58 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         this._workspaceLabel.set_text(`Workspace ${activeIndex + 1}`);
     }
 
-    // Open a popup dialog to rename the current workspace
+    /**
+     * Clears and repopulates the context menu with current-state actions:
+     * rename, reset, separator, remove.
+     */
+    _rebuildContextMenu() {
+        this._indicator.menu.removeAll();
+
+        const rename = new PopupMenu.PopupMenuItem('Rename workspace');
+        rename.connect('activate', () => this._openRenamePopup());
+        this._indicator.menu.addMenuItem(rename);
+
+        const reset = new PopupMenu.PopupMenuItem('Reset workspace name');
+        reset.connect('activate', () => this._resetWorkspaceName());
+        this._indicator.menu.addMenuItem(reset);
+
+        this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        const remove = new PopupMenu.PopupMenuItem('Remove current workspace name');
+        remove.connect('activate', () => this._removeWorkspaceName());
+        this._indicator.menu.addMenuItem(remove);
+    }
+
+    /**
+     * Sets the active workspace name to empty string and trims trailing empties.
+     * No-op if the current index has no name entry.
+     */
+    _resetWorkspaceName() {
+        const idx = global.workspace_manager.get_active_workspace_index();
+        const names = this._getWorkspaceNames();
+        if (idx >= names.length) return;
+        names[idx] = '';
+        this._wmSettings.set_strv('workspace-names', this._trimTrailingEmpty(names));
+    }
+
+    /**
+     * Removes the name entry at the active workspace index; subsequent names
+     * shift one position to the left. Trims trailing empties afterwards.
+     * No-op if the current index has no name entry.
+     */
+    _removeWorkspaceName() {
+        const idx = global.workspace_manager.get_active_workspace_index();
+        const names = this._getWorkspaceNames();
+        if (idx >= names.length) return;
+        names.splice(idx, 1);
+        this._wmSettings.set_strv('workspace-names', this._trimTrailingEmpty(names));
+    }
+
+    /**
+     * Opens the rename dialog pre-filled with the current workspace name.
+     * On confirm, saves the new name (or clears it if the input is empty).
+     * @returns {Promise<void>}
+     */
     async _openRenamePopup() {
         const activeIndex = global.workspace_manager.get_active_workspace_index();
         const names = this._getWorkspaceNames();

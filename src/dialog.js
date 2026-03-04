@@ -5,6 +5,10 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 export const InputDialog = GObject.registerClass(
     class InputDialog extends St.BoxLayout {
+        /**
+         * @param {string} prompt - Label text shown above the entry
+         * @param {string} [initialText=''] - Pre-filled text in the entry
+         */
         _init(prompt, initialText = '') {
             super._init({
                 vertical: true,
@@ -90,6 +94,12 @@ export const InputDialog = GObject.registerClass(
             this._escapeEventId = null;
         }
 
+        /**
+         * Fades in the dialog overlay and returns a Promise that resolves when
+         * the dialog is closed. Resolves with `{ text: string }` on confirm,
+         * or `null` on cancel / Escape.
+         * @returns {Promise<{text: string}|null>}
+         */
         open() {
             this._overlay.opacity = 0;
             this._overlay.ease({
@@ -113,6 +123,10 @@ export const InputDialog = GObject.registerClass(
             return new Promise(resolve => this._resolve = resolve);
         }
 
+        /**
+         * Fades out and destroys the overlay, then resolves the open() Promise.
+         * @param {boolean} [confirm=false] - Whether to resolve with the entry text
+         */
         close(confirm = false) {
             // Clean up
             if (this._escapeEventId) {
@@ -133,10 +147,18 @@ export const InputDialog = GObject.registerClass(
             });
         }
 
+        /**
+         * Moves keyboard focus to the text entry.
+         */
         grabFocus() {
             this._entry.grab_key_focus();
         }
 
+        /**
+         * Handles Enter (confirm) and Escape (cancel) keyboard shortcuts.
+         * @param {Clutter.KeyEvent} keyEvent
+         * @returns {boolean} Clutter.EVENT_STOP or Clutter.EVENT_PROPAGATE
+         */
         vfunc_key_press_event(keyEvent) {
             if (keyEvent.keyval === Clutter.KEY_Return || keyEvent.keyval === Clutter.KEY_KP_Enter) {
                 this.close(true);
