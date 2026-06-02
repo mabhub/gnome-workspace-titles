@@ -7,8 +7,8 @@
 1. Install the extension
 
 ```bash
-mkdir -p ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@MahdadGhasemian.github.io
-cp -r src/* ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@MahdadGhasemian.github.io/
+mkdir -p ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io
+cp -r src/* ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io/
 ```
 
 2. Reload GNOME Shell:
@@ -21,7 +21,7 @@ cp -r src/* ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@MahdadG
 ```bash
 sudo apt install gnome-shell-extension-manager
 
-gnome-extensions enable gnome-workspace-titles@MahdadGhasemian.github.io
+gnome-extensions enable gnome-workspace-titles@mabhub.github.io
 ```
 
 4. Debug
@@ -66,5 +66,5 @@ gnome-extensions install output/gnome-workspace-titles.zip
 3. Enable it:
 
 ```bash
-gnome-extensions enable gnome-workspace-titles@MahdadGhasemian.github.io
+gnome-extensions enable gnome-workspace-titles@mabhub.github.io
 ```
