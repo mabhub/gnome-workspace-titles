@@ -100,7 +100,6 @@ export const MultilineInputDialog = GObject.registerClass(
 
             this._onSort = onSort;
             this._resolve = null;
-            this._pendingShiftAnchor = null;
 
             if (prompt) {
                 const label = new St.Label({ text: prompt, style_class: 'input-dialog-prompt' });
@@ -129,15 +128,14 @@ export const MultilineInputDialog = GObject.registerClass(
             this._clutterText.editable = true;
             this._clutterText.selectable = true;
             this._clutterText.reactive = true;
-            // Fill the entry's full width so clicking in the empty space to the
-            // right of a short line places the cursor at the end of that line,
-            // rather than being ignored.
+            // Let the text fill the entry's full width.
             this._clutterText.x_expand = true;
             this._clutterText.x_align = Clutter.ActorAlign.FILL;
 
-            // Shift+Click should extend the selection from the current cursor to the
-            // clicked position (click-to-extend). ClutterText does not do this on its
-            // own here, so handle it explicitly.
+            // Fix two click behaviours the native handler gets wrong in this
+            // multiline setup: clicking in the empty space right of a short line
+            // (should land at the line's end) and Shift+Click (should extend the
+            // selection). See _onTextButtonPress.
             this._clutterText.connect('button-press-event', (text, event) =>
                 this._onTextButtonPress(text, event));
 
@@ -198,34 +196,64 @@ export const MultilineInputDialog = GObject.registerClass(
         }
 
         /**
-         * Implements Shift+Click "click-to-extend": keeps the current cursor as the
-         * selection anchor, lets ClutterText place the cursor at the clicked
-         * position itself (so scroll offset is handled correctly), then extends the
-         * selection from the anchor to the new cursor. Plain clicks are untouched,
-         * so native click-and-drag selection keeps working.
+         * Handles left-button presses on the text. The event is always propagated so
+         * the native click-and-drag selection still starts; we only *correct* the
+         * cursor afterwards, on a one-shot idle, once the native handler has run.
+         *
+         * - **Plain click**: if the native handler placed the cursor short of where the
+         *   click actually was — which happens when clicking in the empty space to the
+         *   right of a short line, where ClutterText ignores the click — we reproject
+         *   the click ourselves and move the cursor to the clamped position (the end of
+         *   that line). When the native placement already matches, we leave it alone, so
+         *   normal clicks and drag-selection are untouched.
+         * - **Shift+click**: keeps the pre-click cursor as a selection anchor, then
+         *   extends the selection from the anchor to wherever the cursor ended up
+         *   (native placement, or our reprojection for clicks in the void).
+         *
+         * `transform_stage_point` maps the pointer (stage space) into the text's local
+         * space, handling scroll offset and the monitor scale factor (HiDPI, where
+         * physical pixels differ from logical ones); `coords_to_position` then clamps
+         * to the nearest caret position on the clicked line.
          * @param {Clutter.Text} text
          * @param {Clutter.Event} event
          * @returns {boolean} Clutter.EVENT_PROPAGATE (never stops the event)
          */
         _onTextButtonPress(text, event) {
-            const isLeft = event.get_button() === Clutter.BUTTON_PRIMARY;
-            const shift = (event.get_state() & Clutter.ModifierType.SHIFT_MASK) !== 0;
-            if (!isLeft || !shift)
+            if (event.get_button() !== Clutter.BUTTON_PRIMARY)
                 return Clutter.EVENT_PROPAGATE;
 
-            // Anchor = where the cursor currently sits (-1 means end-of-text).
+            const shift = (event.get_state() & Clutter.ModifierType.SHIFT_MASK) !== 0;
+
+            // Anchor (for Shift) = where the cursor sits before this click
+            // (-1 → end-of-text).
             let anchor = text.get_cursor_position();
             if (anchor < 0)
                 anchor = text.get_text().length;
 
-            // Let the default handler place the cursor at the click (correct even
-            // when scrolled), then extend the selection from the anchor to it.
-            this._pendingShiftAnchor = anchor;
+            // Reproject the click into a text position now (coordinates are only valid
+            // synchronously, inside the event), and apply it after the native handler.
+            const [sx, sy] = event.get_coords();
+            const [ok, lx, ly] = text.transform_stage_point(sx, sy);
+            const reprojected = ok ? text.coords_to_position(lx, ly) : -1;
+
             GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
-                if (this._pendingShiftAnchor !== null) {
-                    text.set_selection(this._pendingShiftAnchor, text.get_cursor_position());
-                    this._pendingShiftAnchor = null;
+                let cursor = text.get_cursor_position();
+                if (cursor < 0)
+                    cursor = text.get_text().length;
+
+                // Click in the void to the right of a short line: the native handler
+                // ignored it and left the cursor *before* the reprojected (clamped,
+                // end-of-line) position. Only then do we adopt ours — when the native
+                // placement is at or past it, the native handler was right (normal
+                // click, drag), so we leave it untouched.
+                if (reprojected > cursor) {
+                    text.set_cursor_position(reprojected);
+                    cursor = reprojected;
                 }
+
+                if (shift)
+                    text.set_selection(anchor, cursor);
+
                 return GLib.SOURCE_REMOVE;
             });
 
