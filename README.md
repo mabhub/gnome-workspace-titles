@@ -35,18 +35,23 @@ journalctl -f -o cat /usr/bin/gnome-shell | grep GnomeWorkspaceTitlesExtension
 ## Build for local test
 
 ```bash
+rm -f output/gnome-workspace-titles.zip && \
 cd src && \
 zip -r ../output/gnome-workspace-titles.zip * && \
 cd .. && \
 gnome-extensions install output/gnome-workspace-titles.zip --force
 ```
 
+> `rm -f` first: `zip` updates an existing archive in place, so without it
+> files deleted from `src/` (e.g. a renamed schema) linger in the zip.
+
 ## Publish to GNOME Extensions
 
 ```bash
+rm -f output/gnome-workspace-titles.zip && \
 cd src && \
 zip -r ../output/gnome-workspace-titles.zip * && \
-cd .. && \
+cd ..
 ```
 
 🔗 [Upload to GNOME Extensions](https://extensions.gnome.org/upload/)
