@@ -8,7 +8,64 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 // Local import
-import { InputDialog } from './dialog.js';
+import { InputDialog, MultilineInputDialog } from './dialog.js';
+
+// ───────────────────────────────────────────────
+// Pure text helpers (no GNOME dependency, unit-testable)
+// ───────────────────────────────────────────────
+
+/**
+ * Converts editor text into a workspace-names array: split on newlines,
+ * right-strip each line, then drop trailing empty entries (matching the
+ * zenity rename-all-workspaces.sh semantics).
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function parseEditorText(text) {
+    const names = text.split('\n').map(l => l.replace(/\s+$/, ''));
+    while (names.length && names[names.length - 1] === '') names.pop();
+    return names;
+}
+
+/**
+ * Derives the sort key for a hidden name: strips any leading non-alphanumeric
+ * prefix (emoji, bullet, dash…) plus following whitespace. Falls back to the
+ * raw name if the key would be empty.
+ * @param {string} name
+ * @returns {string}
+ */
+export function sortKey(name) {
+    const stripped = name.replace(/^[^\p{L}\p{N}]+\s*/u, '');
+    return stripped || name;
+}
+
+/**
+ * Reorders ONLY the hidden block (lines after the first blank line)
+ * alphabetically, ignoring decorative prefixes. The active block and the
+ * blank-line separator are preserved verbatim. No-op when there is no blank
+ * line (i.e. nothing is hidden).
+ * @param {string} text
+ * @returns {string}
+ */
+export function sortHiddenNames(text) {
+    const lines = text.split('\n');
+
+    const frontier = lines.findIndex(l => l.replace(/\s+$/, '') === '');
+    if (frontier === -1) return text; // no separator → nothing hidden
+
+    let j = frontier;
+    while (j < lines.length && lines[j].replace(/\s+$/, '') === '') j++;
+
+    const active = lines.slice(0, frontier);
+    const separator = lines.slice(frontier, j);
+    const hidden = lines.slice(j);
+
+    hidden.sort((a, b) =>
+        sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true })
+    );
+
+    return [...active, ...separator, ...hidden].join('\n');
+}
 
 const WorkspaceIndicatorButton = GObject.registerClass(
 class WorkspaceIndicatorButton extends PanelMenu.Button {
@@ -21,8 +78,8 @@ class WorkspaceIndicatorButton extends PanelMenu.Button {
     }
 
     /**
-     * Dispatches pointer button events: left click opens the rename dialog,
-     * right click rebuilds and toggles the context menu.
+     * Dispatches pointer button events: left click opens the multiline editor
+     * for all workspace names, right click rebuilds and toggles the context menu.
      * Middle click and other events are forwarded to the parent implementation.
      * @param {Clutter.Event} event
      * @returns {boolean} Clutter.EVENT_STOP or Clutter.EVENT_PROPAGATE
@@ -30,7 +87,7 @@ class WorkspaceIndicatorButton extends PanelMenu.Button {
     vfunc_event(event) {
         if (event.type() === Clutter.EventType.BUTTON_PRESS) {
             if (event.get_button() === Clutter.BUTTON_PRIMARY) {
-                this._ext._openRenamePopup();
+                this._ext._openEditAllPopup();
                 return Clutter.EVENT_STOP;
             }
             if (event.get_button() === Clutter.BUTTON_SECONDARY) {
@@ -191,6 +248,12 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         const remove = new PopupMenu.PopupMenuItem('Remove current workspace name');
         remove.connect('activate', () => this._removeWorkspaceName());
         this._indicator.menu.addMenuItem(remove);
+
+        this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        const editAll = new PopupMenu.PopupMenuItem('Edit all workspace names');
+        editAll.connect('activate', () => this._openEditAllPopup());
+        this._indicator.menu.addMenuItem(editAll);
     }
 
     /**
@@ -247,6 +310,28 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
                     this._wmSettings.set_strv('workspace-names', currentNames);
                 }
             }
+        }
+    }
+
+    /**
+     * Opens the multiline editor pre-filled with the full workspace-names list
+     * (one name per line). The "Sort hidden" button reorders the hidden block in
+     * place. On confirm, saves the parsed array back to WM settings.
+     * @returns {Promise<void>}
+     */
+    async _openEditAllPopup() {
+        const initialText = this._getWorkspaceNames().join('\n');
+
+        const dialog = new MultilineInputDialog(
+            'Edit all workspace names:',
+            initialText,
+            text => sortHiddenNames(text)
+        );
+
+        const result = await dialog.open();
+
+        if (result !== null) {
+            this._wmSettings.set_strv('workspace-names', parseEditorText(result.text));
         }
     }
 }
