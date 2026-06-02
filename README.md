@@ -11,7 +11,8 @@ every workspace from a single editor.
 ## Features
 
 - **Panel indicator** showing the active workspace's name (falls back to `Workspace N` when unnamed).
-- **Left-click** opens a multiline editor for the whole workspace list — one name per line.
+- **Left-click** opens a native GTK editor window for the whole workspace list — one name per line,
+  with proper text selection and cursor placement.
 - **Right-click** opens a context menu: rename the current workspace, reset it, remove it, or edit
   all names.
 - **Parked names**: keep spare workspace names below a blank line in the editor. GNOME only shows
