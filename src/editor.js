@@ -17,18 +17,32 @@
 import Gtk from 'gi://Gtk?version=4.0';
 import Gdk from 'gi://Gdk';
 import Gio from 'gi://Gio';
-import GioUnix from 'gi://GioUnix';
 import system from 'system';
 
 import { sortHiddenNames } from './workspace-names.js';
+
+/**
+ * Builds an input stream over a file descriptor. The Unix stream class moved
+ * from Gio.UnixInputStream to the GioUnix namespace in newer gjs (GNOME 46);
+ * GNOME 45 only has the old name. Try the new one, fall back to the old.
+ * @param {number} fd
+ * @returns {Gio.InputStream}
+ */
+function unixInputStream(fd) {
+    try {
+        const GioUnix = imports.gi.GioUnix;
+        return new GioUnix.InputStream({ fd, close_fd: false });
+    } catch (e) {
+        return new Gio.UnixInputStream({ fd, close_fd: false });
+    }
+}
 
 /**
  * Reads STDIN to EOF and returns it as a UTF-8 string (one name per line).
  * @returns {string}
  */
 function readStdin() {
-    const base = new GioUnix.InputStream({ fd: 0, close_fd: false });
-    const stream = new Gio.DataInputStream({ base_stream: base });
+    const stream = new Gio.DataInputStream({ base_stream: unixInputStream(0) });
     const lines = [];
     let line;
     while ((line = stream.read_line_utf8(null)[0]) !== null)
@@ -43,7 +57,10 @@ const app = new Gtk.Application({
     flags: Gio.ApplicationFlags.NON_UNIQUE,
 });
 
-let resultText = null;   // text to emit on STDOUT if confirmed (null = cancelled)
+// Text to emit on STDOUT if confirmed; stays null when cancelled. Closing the
+// window via the window manager's X button leaves it null too, so that path is
+// treated exactly like Cancel (nothing written, non-zero exit).
+let resultText = null;
 
 app.connect('activate', () => {
     const win = new Gtk.ApplicationWindow({

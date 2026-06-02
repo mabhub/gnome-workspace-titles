@@ -53,6 +53,9 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         // Access standard WM workspace-names setting
         this._wmSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.wm.preferences' });
 
+        // Holds the editor subprocess while its window is open (see _openEditAllPopup).
+        this._editorProc = null;
+
         // Create a panel button
         this._indicator = new WorkspaceIndicatorButton(this);
 
@@ -94,6 +97,13 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     disable() {
+        // Kill any open editor: its async completion callback would otherwise
+        // fire after disable() has nulled _wmSettings (see _openEditAllPopup).
+        if (this._editorProc) {
+            this._editorProc.force_exit();
+            this._editorProc = null;
+        }
+
         // Clean up
         if (this._workspaceSignal) {
             global.workspace_manager.disconnect(this._workspaceSignal);
@@ -268,33 +278,49 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
      * @returns {Promise<void>}
      */
     async _openEditAllPopup() {
+        // Only one editor at a time: a second one could overwrite the first's edits.
+        if (this._editorProc)
+            return;
+
+        const gjs = GLib.find_program_in_path('gjs');
+        if (!gjs) {
+            logError(new Error('gjs not found in PATH'), 'Cannot launch the workspace-names editor');
+            return;
+        }
+
         const initialText = this._getWorkspaceNames().join('\n');
         const editorPath = GLib.build_filenamev([this.path, 'editor.js']);
 
         const proc = new Gio.Subprocess({
-            argv: ['gjs', '-m', editorPath],
+            argv: [gjs, '-m', editorPath],
             flags: Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE,
         });
 
         try {
             proc.init(null);
-        } catch (e) {
-            logError(e, 'Failed to launch the workspace-names editor');
-            return;
-        }
+            this._editorProc = proc;
 
-        const [stdout] = await new Promise((resolve, reject) => {
-            proc.communicate_utf8_async(initialText, null, (p, res) => {
-                try {
-                    resolve(p.communicate_utf8_finish(res));
-                } catch (e) {
-                    reject(e);
-                }
+            const [stdout] = await new Promise((resolve, reject) => {
+                proc.communicate_utf8_async(initialText, null, (p, res) => {
+                    try {
+                        resolve(p.communicate_utf8_finish(res));
+                    } catch (e) {
+                        reject(e);
+                    }
+                });
             });
-        });
 
-        // Save only when the editor confirmed (exit 0); Cancel/Escape exits non-zero.
-        if (proc.get_exit_status() === 0)
-            this._wmSettings.set_strv('workspace-names', parseEditorText(stdout));
+            // Save only when the editor confirmed (exit 0); Cancel/Escape/closing
+            // the window exits non-zero. Guard _wmSettings: disable() may have run
+            // (and force-exited the editor) while we awaited.
+            if (this._wmSettings && proc.get_exit_status() === 0)
+                this._wmSettings.set_strv('workspace-names', parseEditorText(stdout));
+        } catch (e) {
+            logError(e, 'Workspace-names editor failed');
+        } finally {
+            // Clear unless disable() already replaced/nulled it.
+            if (this._editorProc === proc)
+                this._editorProc = null;
+        }
     }
 }
