@@ -1,71 +1,16 @@
 import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
-// Local import
-import { InputDialog, MultilineInputDialog } from './dialog.js';
-
-// ───────────────────────────────────────────────
-// Pure text helpers (no GNOME dependency, unit-testable)
-// ───────────────────────────────────────────────
-
-/**
- * Converts editor text into a workspace-names array: split on newlines,
- * right-strip each line, then drop trailing empty entries (matching the
- * zenity rename-all-workspaces.sh semantics).
- * @param {string} text
- * @returns {string[]}
- */
-export function parseEditorText(text) {
-    const names = text.split('\n').map(l => l.replace(/\s+$/, ''));
-    while (names.length && names[names.length - 1] === '') names.pop();
-    return names;
-}
-
-/**
- * Derives the sort key for a hidden name: strips any leading non-alphanumeric
- * prefix (emoji, bullet, dash…) plus following whitespace. Falls back to the
- * raw name if the key would be empty.
- * @param {string} name
- * @returns {string}
- */
-export function sortKey(name) {
-    const stripped = name.replace(/^[^\p{L}\p{N}]+\s*/u, '');
-    return stripped || name;
-}
-
-/**
- * Reorders ONLY the hidden block (lines after the first blank line)
- * alphabetically, ignoring decorative prefixes. The active block and the
- * blank-line separator are preserved verbatim. No-op when there is no blank
- * line (i.e. nothing is hidden).
- * @param {string} text
- * @returns {string}
- */
-export function sortHiddenNames(text) {
-    const lines = text.split('\n');
-
-    const frontier = lines.findIndex(l => l.replace(/\s+$/, '') === '');
-    if (frontier === -1) return text; // no separator → nothing hidden
-
-    let j = frontier;
-    while (j < lines.length && lines[j].replace(/\s+$/, '') === '') j++;
-
-    const active = lines.slice(0, frontier);
-    const separator = lines.slice(frontier, j);
-    const hidden = lines.slice(j);
-
-    hidden.sort((a, b) =>
-        sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true })
-    );
-
-    return [...active, ...separator, ...hidden].join('\n');
-}
+// Local imports
+import { InputDialog } from './dialog.js';
+import { parseEditorText } from './workspace-names.js';
 
 const WorkspaceIndicatorButton = GObject.registerClass(
 class WorkspaceIndicatorButton extends PanelMenu.Button {
@@ -315,23 +260,41 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
 
     /**
      * Opens the multiline editor pre-filled with the full workspace-names list
-     * (one name per line). The "Sort hidden" button reorders the hidden block in
-     * place. On confirm, saves the parsed array back to WM settings.
+     * (one name per line). The editor is an external GTK4 process (editor.js): it
+     * gives us a native multiline text widget, which St.Entry cannot. The current
+     * list is piped to its stdin; on OK it prints the edited text to stdout and
+     * exits 0, on Cancel/Escape it exits non-zero. The "Sort hidden" button is
+     * handled inside that process. On OK, the parsed array is saved to WM settings.
      * @returns {Promise<void>}
      */
     async _openEditAllPopup() {
         const initialText = this._getWorkspaceNames().join('\n');
+        const editorPath = GLib.build_filenamev([this.path, 'editor.js']);
 
-        const dialog = new MultilineInputDialog(
-            'Edit all workspace names:',
-            initialText,
-            text => sortHiddenNames(text)
-        );
+        const proc = new Gio.Subprocess({
+            argv: ['gjs', '-m', editorPath],
+            flags: Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE,
+        });
 
-        const result = await dialog.open();
-
-        if (result !== null) {
-            this._wmSettings.set_strv('workspace-names', parseEditorText(result.text));
+        try {
+            proc.init(null);
+        } catch (e) {
+            logError(e, 'Failed to launch the workspace-names editor');
+            return;
         }
+
+        const [stdout] = await new Promise((resolve, reject) => {
+            proc.communicate_utf8_async(initialText, null, (p, res) => {
+                try {
+                    resolve(p.communicate_utf8_finish(res));
+                } catch (e) {
+                    reject(e);
+                }
+            });
+        });
+
+        // Save only when the editor confirmed (exit 0); Cancel/Escape exits non-zero.
+        if (proc.get_exit_status() === 0)
+            this._wmSettings.set_strv('workspace-names', parseEditorText(stdout));
     }
 }

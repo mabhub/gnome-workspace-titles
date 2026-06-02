@@ -1,6 +1,7 @@
-/* Both dialogs are standard ModalDialogs and follow the system theme (light or
-   dark). No hard-coded colors: text inherits the modal's theme color, and the
-   entry uses a neutral translucent border that reads on either background. */
+/* The rename dialog is a standard ModalDialog and follows the system theme
+   (light or dark). No hard-coded colors: text inherits the modal's theme color,
+   and the entry uses a neutral translucent border that reads on either
+   background. (The all-names editor is a separate GTK4 window — see editor.js.) */
 
 .input-dialog-prompt {
   font-weight: bold;
@@ -16,12 +17,6 @@
   min-width: 280px;
 }
 
-.multiline-dialog .modal-dialog-content-box,
 .rename-dialog .modal-dialog-content-box {
   spacing: 12px;
-}
-
-.input-dialog-scroll {
-  height: 300px;
-  min-width: 360px;
 }
