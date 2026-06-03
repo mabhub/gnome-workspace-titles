@@ -12,13 +12,18 @@ every workspace from a single editor.
 
 - **Panel indicator** showing the active workspace's name (falls back to `Workspace N` when unnamed).
 - **Left-click** opens a native GTK editor window for the whole workspace list — one name per line,
-  with proper text selection and cursor placement.
-- **Right-click** opens a context menu: rename the current workspace, reset it, remove it, or edit
-  all names.
+  with proper text selection and cursor placement. The editor is single-instance: clicking again
+  while it is open just brings the window back to the front.
+- **Right-click** opens a context menu: rename the current workspace, reset it, hide it (park it
+  below the blank line instead of deleting it), or edit all names.
 - **Parked names**: keep spare workspace names below a blank line in the editor. GNOME only shows
-  the active ones; the rest wait there, ready to be moved back up.
+  the active ones; the rest wait there, ready to be moved back up. As you add or remove workspaces,
+  the extension keeps the parked block past the panel automatically, so a parked name never leaks
+  into view.
 - **Sort hidden**: alphabetically reorders the parked names, ignoring a leading emoji/bullet prefix,
   with natural numeric ordering — the active names and the blank-line separator are left untouched.
+- **Keyboard shortcut**: because the editor runs as a standalone program, you can bind a shortcut
+  (e.g. <kbd>Super</kbd>+<kbd>F3</kbd>) straight to it — see *Bind a shortcut* below.
 
 Names are stored in the standard GNOME key `org.gnome.desktop.wm.preferences` → `workspace-names`,
 so they persist independently of the extension and interoperate with `gsettings` and your own
@@ -31,6 +36,32 @@ scripts.
   discard.
 - Put a **blank line** after your active names; anything below it is "parked" and hidden from GNOME.
 - Click **Sort hidden** to alphabetize the parked block.
+
+## Bind a shortcut
+
+The editor is a standalone single-instance program, so a custom GNOME shortcut can open the very
+same window the panel does (pressing it again just raises the open window). Point a custom keybinding
+at `gjs -m <installed>/editor.js`:
+
+```bash
+gjs="$(command -v gjs)"
+editor="$HOME/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io/editor.js"
+
+schema=org.gnome.settings-daemon.plugins.media-keys
+key=/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/workspace-titles/
+
+# Add our keybinding without dropping any existing custom ones.
+existing="$(gsettings get $schema custom-keybindings)"
+case "$existing" in
+  *"$key"*) ;; # already listed
+  "@as []"|"[]") gsettings set $schema custom-keybindings "['$key']" ;;
+  *) gsettings set $schema custom-keybindings "${existing%]}, '$key']" ;;
+esac
+
+gsettings set $schema.custom-keybinding:$key name 'Edit workspace names'
+gsettings set $schema.custom-keybinding:$key command "$gjs -m $editor"
+gsettings set $schema.custom-keybinding:$key binding '<Super>F3'
+```
 
 ## Install from source
 
