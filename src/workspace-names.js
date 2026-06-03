@@ -55,3 +55,34 @@ export function sortHiddenNames(text) {
 
     return [...active, ...separator, ...hidden].join('\n');
 }
+
+/**
+ * Moves the active name at `index` into the hidden block (the entries after the
+ * first blank ''), then re-sorts the hidden block alphabetically with the same
+ * prefix-aware natural ordering as sortHiddenNames. Creates the blank-line
+ * separator when none exists yet. Returns a new array. No-op (returns a copy
+ * unchanged) when the index has no name or the name is empty.
+ * @param {string[]} strv
+ * @param {number} index
+ * @returns {string[]}
+ */
+export function hideName(strv, index) {
+    if (index < 0 || index >= strv.length || strv[index] === '')
+        return [...strv];
+
+    const name = strv[index];
+    const next = strv.toSpliced(index, 1); // active zone shifts left
+
+    const frontier = next.findIndex(s => s === '');
+    let firstHidden = frontier === -1 ? next.length : frontier;
+    while (firstHidden < next.length && next[firstHidden] === '') firstHidden++;
+
+    // Everything up to the hidden block (actives + separator), with at least one
+    // blank line so a separator exists even when nothing was hidden before.
+    const head = frontier === -1 ? [...next, ''] : next.slice(0, firstHidden);
+    const hidden = [...next.slice(firstHidden), name].toSorted((a, b) =>
+        sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true })
+    );
+
+    return [...head, ...hidden];
+}
