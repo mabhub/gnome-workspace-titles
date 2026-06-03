@@ -10,7 +10,6 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 // Local imports
 import { InputDialog } from './dialog.js';
-import { parseEditorText } from './workspace-names.js';
 
 const WorkspaceIndicatorButton = GObject.registerClass(
 class WorkspaceIndicatorButton extends PanelMenu.Button {
@@ -53,9 +52,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         // Access standard WM workspace-names setting
         this._wmSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.wm.preferences' });
 
-        // Holds the editor subprocess while its window is open (see _openEditAllPopup).
-        this._editorProc = null;
-
         // Create a panel button
         this._indicator = new WorkspaceIndicatorButton(this);
 
@@ -97,13 +93,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     disable() {
-        // Kill any open editor: its async completion callback would otherwise
-        // fire after disable() has nulled _wmSettings (see _openEditAllPopup).
-        if (this._editorProc) {
-            this._editorProc.force_exit();
-            this._editorProc = null;
-        }
-
         // Clean up
         if (this._workspaceSignal) {
             global.workspace_manager.disconnect(this._workspaceSignal);
@@ -269,58 +258,28 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     /**
-     * Opens the multiline editor pre-filled with the full workspace-names list
-     * (one name per line). The editor is an external GTK4 process (editor.js): it
-     * gives us a native multiline text widget, which St.Entry cannot. The current
-     * list is piped to its stdin; on OK it prints the edited text to stdout and
-     * exits 0, on Cancel/Escape it exits non-zero. The "Sort hidden" button is
-     * handled inside that process. On OK, the parsed array is saved to WM settings.
-     * @returns {Promise<void>}
+     * Launches the standalone editor (editor.js) for the full workspace-names
+     * list. The editor is a single-instance GTK app that reads and writes the
+     * names itself, so this is fire-and-forget: launching it again while its
+     * window is open just raises that window (GTK handles instance unicity).
      */
-    async _openEditAllPopup() {
-        // Only one editor at a time: a second one could overwrite the first's edits.
-        if (this._editorProc)
-            return;
-
+    _openEditAllPopup() {
         const gjs = GLib.find_program_in_path('gjs');
         if (!gjs) {
             logError(new Error('gjs not found in PATH'), 'Cannot launch the workspace-names editor');
             return;
         }
 
-        const initialText = this._getWorkspaceNames().join('\n');
         const editorPath = GLib.build_filenamev([this.path, 'editor.js']);
 
-        const proc = new Gio.Subprocess({
-            argv: [gjs, '-m', editorPath],
-            flags: Gio.SubprocessFlags.STDIN_PIPE | Gio.SubprocessFlags.STDOUT_PIPE,
-        });
-
         try {
-            proc.init(null);
-            this._editorProc = proc;
-
-            const [stdout] = await new Promise((resolve, reject) => {
-                proc.communicate_utf8_async(initialText, null, (p, res) => {
-                    try {
-                        resolve(p.communicate_utf8_finish(res));
-                    } catch (e) {
-                        reject(e);
-                    }
-                });
+            const proc = new Gio.Subprocess({
+                argv: [gjs, '-m', editorPath],
+                flags: Gio.SubprocessFlags.NONE,
             });
-
-            // Save only when the editor confirmed (exit 0); Cancel/Escape/closing
-            // the window exits non-zero. Guard _wmSettings: disable() may have run
-            // (and force-exited the editor) while we awaited.
-            if (this._wmSettings && proc.get_exit_status() === 0)
-                this._wmSettings.set_strv('workspace-names', parseEditorText(stdout));
+            proc.init(null);
         } catch (e) {
-            logError(e, 'Workspace-names editor failed');
-        } finally {
-            // Clear unless disable() already replaced/nulled it.
-            if (this._editorProc === proc)
-                this._editorProc = null;
+            logError(e, 'Failed to launch the workspace-names editor');
         }
     }
 }
