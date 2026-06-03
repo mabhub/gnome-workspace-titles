@@ -10,6 +10,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 // Local imports
 import { InputDialog } from './dialog.js';
+import { hideName, padSeparator } from './workspace-names.js';
 
 const WorkspaceIndicatorButton = GObject.registerClass(
 class WorkspaceIndicatorButton extends PanelMenu.Button {
@@ -189,9 +190,9 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
 
         this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        const remove = new PopupMenu.PopupMenuItem('Remove current workspace name');
-        remove.connect('activate', () => this._removeWorkspaceName());
-        this._indicator.menu.addMenuItem(remove);
+        const hide = new PopupMenu.PopupMenuItem('Hide current workspace name');
+        hide.connect('activate', () => this._hideWorkspaceName());
+        this._indicator.menu.addMenuItem(hide);
 
         this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
@@ -213,16 +214,16 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     /**
-     * Removes the name entry at the active workspace index; subsequent names
-     * shift one position to the left. Trims trailing empties afterwards.
-     * No-op if the current index has no name entry.
+     * Hides the active workspace name: moves it into the sorted hidden block
+     * (see hideName) instead of deleting it, then re-pads the separator so the
+     * hidden block stays past the next-workspace slot. No-op if the current
+     * index has no name.
      */
-    _removeWorkspaceName() {
+    _hideWorkspaceName() {
         const idx = global.workspace_manager.get_active_workspace_index();
-        const names = this._getWorkspaceNames();
-        if (idx >= names.length) return;
-        names.splice(idx, 1);
-        this._wmSettings.set_strv('workspace-names', this._trimTrailingEmpty(names));
+        const hidden = hideName(this._getWorkspaceNames(), idx);
+        const padded = padSeparator(hidden, global.workspace_manager.get_n_workspaces());
+        this._wmSettings.set_strv('workspace-names', padded);
     }
 
     /**
