@@ -84,6 +84,16 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
             () => this._updateWorkspaceNumber()
         );
 
+        // Keep the hidden block from leaking into the panel as workspaces come
+        // and go (dynamic workspaces). notify::n-workspaces covers add + remove.
+        this._nWorkspacesSignal = global.workspace_manager.connect(
+            'notify::n-workspaces',
+            () => this._enforceSeparatorMargin()
+        );
+
+        // Enforce once at startup in case the count changed while disabled.
+        this._enforceSeparatorMargin();
+
         // update when extension settings change
         this._settings.connect('changed', () => this._updateWorkspaceNumber());
 
@@ -98,6 +108,11 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         if (this._workspaceSignal) {
             global.workspace_manager.disconnect(this._workspaceSignal);
             this._workspaceSignal = null;
+        }
+
+        if (this._nWorkspacesSignal) {
+            global.workspace_manager.disconnect(this._nWorkspacesSignal);
+            this._nWorkspacesSignal = null;
         }
 
         if (this._indicator) {
@@ -224,6 +239,20 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         const hidden = hideName(this._getWorkspaceNames(), idx);
         const padded = padSeparator(hidden, global.workspace_manager.get_n_workspaces());
         this._wmSettings.set_strv('workspace-names', padded);
+    }
+
+    /**
+     * Keeps the hidden block past the next-workspace slot as workspaces are
+     * created/removed (see padSeparator). Rewrites workspace-names only when the
+     * result differs — this is the guard that breaks the changed::workspace-names
+     * feedback loop (a second pass produces an identical strv, so no rewrite).
+     */
+    _enforceSeparatorMargin() {
+        if (!this._wmSettings) return;
+        const names = this._getWorkspaceNames();
+        const padded = padSeparator(names, global.workspace_manager.get_n_workspaces());
+        if (padded.length !== names.length || padded.some((n, i) => n !== names[i]))
+            this._wmSettings.set_strv('workspace-names', padded);
     }
 
     /**
