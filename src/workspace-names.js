@@ -86,3 +86,29 @@ export function hideName(strv, index) {
 
     return [...head, ...hidden];
 }
+
+/**
+ * Guarantees the hidden block starts beyond the next-workspace slot, so a hidden
+ * name never leaks into the panel. Resizes the run of blank '' items between the
+ * active zone and the hidden block so the first hidden name sits at index
+ * workspaceCount + 1 (symmetric: pads when workspaces grow, trims the surplus
+ * when they shrink, but always keeps at least one blank). No-op when there is no
+ * hidden block. Returns a new array.
+ * @param {string[]} strv
+ * @param {number} workspaceCount
+ * @returns {string[]}
+ */
+export function padSeparator(strv, workspaceCount) {
+    const frontier = strv.findIndex(s => s === '');
+    if (frontier === -1) return [...strv]; // no separator → nothing hidden
+
+    let firstHidden = frontier;
+    while (firstHidden < strv.length && strv[firstHidden] === '') firstHidden++;
+    if (firstHidden >= strv.length) return [...strv]; // only trailing blanks → nothing hidden
+
+    const active = strv.slice(0, frontier);
+    const hidden = strv.slice(firstHidden);
+    const blanks = Math.max(workspaceCount + 1 - active.length, 1);
+
+    return [...active, ...Array(blanks).fill(''), ...hidden];
+}
