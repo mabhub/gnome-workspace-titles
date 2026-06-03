@@ -29,6 +29,45 @@ export function sortKey(name) {
 }
 
 /**
+ * Comparator that orders hidden names by their sort key (decorative prefix
+ * stripped), case-insensitively and with natural numeric ordering.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
+const byHiddenOrder = (a, b) =>
+    sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true });
+
+/**
+ * Splits a list around the first blank entry into its active block, the
+ * blank-line separator, and the hidden block. The blankness test is supplied by
+ * the caller so this works both on editor text lines (which may carry trailing
+ * whitespace) and on a clean strv. `frontier` is -1 (and hidden is empty) when
+ * there is no separator, or when only trailing blanks remain (nothing hidden).
+ * @param {string[]} items
+ * @param {(item: string) => boolean} isBlank
+ * @returns {{active: string[], separator: string[], hidden: string[], frontier: number}}
+ */
+const splitHidden = (items, isBlank) => {
+    const frontier = items.findIndex(isBlank);
+    if (frontier === -1)
+        return { active: [...items], separator: [], hidden: [], frontier: -1 };
+
+    let firstHidden = frontier;
+    while (firstHidden < items.length && isBlank(items[firstHidden])) firstHidden++;
+
+    return {
+        active: items.slice(0, frontier),
+        separator: items.slice(frontier, firstHidden),
+        hidden: items.slice(firstHidden),
+        frontier,
+    };
+};
+
+const isBlankLine = line => line.replace(/\s+$/, '') === '';
+const isBlankItem = item => item === '';
+
+/**
  * Reorders ONLY the hidden block (lines after the first blank line)
  * alphabetically, ignoring decorative prefixes. The active block and the
  * blank-line separator are preserved verbatim. No-op when there is no blank
@@ -37,23 +76,10 @@ export function sortKey(name) {
  * @returns {string}
  */
 export function sortHiddenNames(text) {
-    const lines = text.split('\n');
-
-    const frontier = lines.findIndex(l => l.replace(/\s+$/, '') === '');
+    const { active, separator, hidden, frontier } = splitHidden(text.split('\n'), isBlankLine);
     if (frontier === -1) return text; // no separator → nothing hidden
 
-    let j = frontier;
-    while (j < lines.length && lines[j].replace(/\s+$/, '') === '') j++;
-
-    const active = lines.slice(0, frontier);
-    const separator = lines.slice(frontier, j);
-    const hidden = lines.slice(j);
-
-    hidden.sort((a, b) =>
-        sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true })
-    );
-
-    return [...active, ...separator, ...hidden].join('\n');
+    return [...active, ...separator, ...hidden.toSorted(byHiddenOrder)].join('\n');
 }
 
 /**
@@ -73,18 +99,13 @@ export function hideName(strv, index) {
     const name = strv[index];
     const next = strv.toSpliced(index, 1); // active zone shifts left
 
-    const frontier = next.findIndex(s => s === '');
-    let firstHidden = frontier === -1 ? next.length : frontier;
-    while (firstHidden < next.length && next[firstHidden] === '') firstHidden++;
+    const { active, separator, hidden, frontier } = splitHidden(next, isBlankItem);
 
-    // Everything up to the hidden block (actives + separator), with at least one
-    // blank line so a separator exists even when nothing was hidden before.
-    const head = frontier === -1 ? [...next, ''] : next.slice(0, firstHidden);
-    const hidden = [...next.slice(firstHidden), name].toSorted((a, b) =>
-        sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true })
-    );
+    // Keep a separator: reuse the existing blank run, or add one when nothing was
+    // hidden before (frontier === -1, so active holds the whole list).
+    const head = frontier === -1 ? [...active, ''] : [...active, ...separator];
 
-    return [...head, ...hidden];
+    return [...head, ...[...hidden, name].toSorted(byHiddenOrder)];
 }
 
 /**
@@ -99,15 +120,9 @@ export function hideName(strv, index) {
  * @returns {string[]}
  */
 export function padSeparator(strv, workspaceCount) {
-    const frontier = strv.findIndex(s => s === '');
-    if (frontier === -1) return [...strv]; // no separator → nothing hidden
+    const { active, hidden, frontier } = splitHidden(strv, isBlankItem);
+    if (frontier === -1 || hidden.length === 0) return [...strv]; // nothing hidden
 
-    let firstHidden = frontier;
-    while (firstHidden < strv.length && strv[firstHidden] === '') firstHidden++;
-    if (firstHidden >= strv.length) return [...strv]; // only trailing blanks → nothing hidden
-
-    const active = strv.slice(0, frontier);
-    const hidden = strv.slice(firstHidden);
     const blanks = Math.max(workspaceCount + 1 - active.length, 1);
 
     return [...active, ...Array(blanks).fill(''), ...hidden];

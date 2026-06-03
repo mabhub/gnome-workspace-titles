@@ -190,7 +190,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
 
     /**
      * Clears and repopulates the context menu with current-state actions:
-     * rename, reset, separator, remove.
+     * rename, reset, hide, edit all.
      */
     _rebuildContextMenu() {
         this._indicator.menu.removeAll();
@@ -229,6 +229,19 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     /**
+     * Writes workspace-names only when `next` differs from `current`. Skipping
+     * no-op writes avoids a redundant changed::workspace-names signal — and in
+     * particular breaks the feedback loop with the notify::n-workspaces handler
+     * (a second padSeparator pass produces an identical strv, so no rewrite).
+     * @param {string[]} current - The names just read from settings
+     * @param {string[]} next - The candidate names to persist
+     */
+    _setNamesIfChanged(current, next) {
+        if (next.length !== current.length || next.some((n, i) => n !== current[i]))
+            this._wmSettings.set_strv('workspace-names', next);
+    }
+
+    /**
      * Hides the active workspace name: moves it into the sorted hidden block
      * (see hideName) instead of deleting it, then re-pads the separator so the
      * hidden block stays past the next-workspace slot. No-op if the current
@@ -236,23 +249,21 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
      */
     _hideWorkspaceName() {
         const idx = global.workspace_manager.get_active_workspace_index();
-        const hidden = hideName(this._getWorkspaceNames(), idx);
+        const names = this._getWorkspaceNames();
+        const hidden = hideName(names, idx);
         const padded = padSeparator(hidden, global.workspace_manager.get_n_workspaces());
-        this._wmSettings.set_strv('workspace-names', padded);
+        this._setNamesIfChanged(names, padded);
     }
 
     /**
      * Keeps the hidden block past the next-workspace slot as workspaces are
-     * created/removed (see padSeparator). Rewrites workspace-names only when the
-     * result differs — this is the guard that breaks the changed::workspace-names
-     * feedback loop (a second pass produces an identical strv, so no rewrite).
+     * created/removed (see padSeparator).
      */
     _enforceSeparatorMargin() {
         if (!this._wmSettings) return;
         const names = this._getWorkspaceNames();
         const padded = padSeparator(names, global.workspace_manager.get_n_workspaces());
-        if (padded.length !== names.length || padded.some((n, i) => n !== names[i]))
-            this._wmSettings.set_strv('workspace-names', padded);
+        this._setNamesIfChanged(names, padded);
     }
 
     /**
