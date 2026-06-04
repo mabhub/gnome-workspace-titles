@@ -15,5 +15,29 @@
       <description>Index position within the chosen panel box (0 = start). Defaults to 1 so the indicator sits after the Activities button, keeping the 0×0 hot corner clickable.</description>
     </key>
 
+    <key name="rename-shortcut" type="as">
+      <default><![CDATA[['<Super>F2']]]></default>
+      <summary>Rename current workspace shortcut</summary>
+      <description>Accelerator that opens the single-line editor to rename the current workspace.</description>
+    </key>
+
+    <key name="rename-shortcut-enabled" type="b">
+      <default>true</default>
+      <summary>Enable the rename shortcut</summary>
+      <description>When true, the rename-current-workspace keybinding is registered.</description>
+    </key>
+
+    <key name="edit-all-shortcut" type="as">
+      <default><![CDATA[['<Super>F3']]]></default>
+      <summary>Edit all workspace names shortcut</summary>
+      <description>Accelerator that opens the multiline editor for all workspace names.</description>
+    </key>
+
+    <key name="edit-all-shortcut-enabled" type="b">
+      <default>true</default>
+      <summary>Enable the edit-all shortcut</summary>
+      <description>When true, the edit-all-workspace-names keybinding is registered.</description>
+    </key>
+
   </schema>
 </schemalist>
