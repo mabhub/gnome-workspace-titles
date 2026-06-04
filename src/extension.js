@@ -3,6 +3,8 @@ import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Meta from 'gi://Meta';
+import Shell from 'gi://Shell';
 import { Extension } from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
@@ -100,11 +102,33 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         // update when WM workspace-names change (e.g. from rename script)
         this._wmSettingsSignal = this._wmSettings.connect('changed::workspace-names', () => this._updateWorkspaceNumber());
 
+        // Register the editor keybindings and react to their on/off toggles.
+        this._registerShortcuts();
+        this._renameEnabledSignal = this._settings.connect(
+            'changed::rename-shortcut-enabled',
+            () => this._bindShortcut('rename-shortcut', () => this._openRenameCurrent())
+        );
+        this._editAllEnabledSignal = this._settings.connect(
+            'changed::edit-all-shortcut-enabled',
+            () => this._bindShortcut('edit-all-shortcut', () => this._openEditAllPopup())
+        );
+
         console.debug("[GnomeWorkspaceTitlesExtension] Enabled");
     }
 
     disable() {
         // Clean up
+        Main.wm.removeKeybinding('rename-shortcut');
+        Main.wm.removeKeybinding('edit-all-shortcut');
+        if (this._renameEnabledSignal) {
+            this._settings.disconnect(this._renameEnabledSignal);
+            this._renameEnabledSignal = null;
+        }
+        if (this._editAllEnabledSignal) {
+            this._settings.disconnect(this._editAllEnabledSignal);
+            this._editAllEnabledSignal = null;
+        }
+
         if (this._workspaceSignal) {
             global.workspace_manager.disconnect(this._workspaceSignal);
             this._workspaceSignal = null;
@@ -214,6 +238,26 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         const editAll = new PopupMenu.PopupMenuItem('Edit all workspace names');
         editAll.connect('activate', () => this._openEditAllPopup());
         this._indicator.menu.addMenuItem(editAll);
+
+        this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+
+        const renameSwitch = new PopupMenu.PopupSwitchMenuItem(
+            'Super+F2: rename current',
+            this._settings.get_boolean('rename-shortcut-enabled')
+        );
+        renameSwitch.connect('toggled', (_i, state) =>
+            this._settings.set_boolean('rename-shortcut-enabled', state)
+        );
+        this._indicator.menu.addMenuItem(renameSwitch);
+
+        const editAllSwitch = new PopupMenu.PopupSwitchMenuItem(
+            'Super+F3: edit all',
+            this._settings.get_boolean('edit-all-shortcut-enabled')
+        );
+        editAllSwitch.connect('toggled', (_i, state) =>
+            this._settings.set_boolean('edit-all-shortcut-enabled', state)
+        );
+        this._indicator.menu.addMenuItem(editAllSwitch);
     }
 
     /**
@@ -304,7 +348,13 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
      * names itself, so this is fire-and-forget: launching it again while its
      * window is open just raises that window (GTK handles instance unicity).
      */
-    _openEditAllPopup() {
+    /**
+     * Launches the standalone single-instance editor (editor.js), optionally
+     * with extra arguments (e.g. ['--rename', '2']). Fire-and-forget: a second
+     * launch raises or re-renders the existing window (GTK handles unicity).
+     * @param {string[]} [extraArgv=[]]
+     */
+    _launchEditor(extraArgv = []) {
         const gjs = GLib.find_program_in_path('gjs');
         if (!gjs) {
             logError(new Error('gjs not found in PATH'), 'Cannot launch the workspace-names editor');
@@ -315,12 +365,54 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
 
         try {
             const proc = new Gio.Subprocess({
-                argv: [gjs, '-m', editorPath],
+                argv: [gjs, '-m', editorPath, ...extraArgv],
                 flags: Gio.SubprocessFlags.NONE,
             });
             proc.init(null);
         } catch (e) {
             logError(e, 'Failed to launch the workspace-names editor');
         }
+    }
+
+    /**
+     * Opens the multiline editor for all workspace names.
+     */
+    _openEditAllPopup() {
+        this._launchEditor();
+    }
+
+    /**
+     * Opens the single-line rename view for the current workspace.
+     */
+    _openRenameCurrent() {
+        const idx = global.workspace_manager.get_active_workspace_index();
+        this._launchEditor(['--rename', String(idx)]);
+    }
+
+    /**
+     * Registers (or re-registers) a keybinding from a settings key, but only
+     * when its companion `<key>-enabled` boolean is true. Always removes any
+     * existing binding for that key first, so toggling can't leak a binding.
+     * @param {string} key - The `as` settings key holding the accelerator
+     * @param {() => void} handler
+     */
+    _bindShortcut(key, handler) {
+        Main.wm.removeKeybinding(key); // idempotent: no-op if the key was never bound
+        if (!this._settings.get_boolean(`${key}-enabled`)) return;
+        Main.wm.addKeybinding(
+            key,
+            this._settings,
+            Meta.KeyBindingFlags.NONE,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW,
+            handler
+        );
+    }
+
+    /**
+     * Registers both editor keybindings according to their enabled flags.
+     */
+    _registerShortcuts() {
+        this._bindShortcut('rename-shortcut', () => this._openRenameCurrent());
+        this._bindShortcut('edit-all-shortcut', () => this._openEditAllPopup());
     }
 }
