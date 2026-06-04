@@ -127,3 +127,23 @@ export function padSeparator(strv, workspaceCount) {
 
     return [...active, ...Array(blanks).fill(''), ...hidden];
 }
+
+/**
+ * Sets the workspace name at `index`, padding the array with '' when the index
+ * is past the end, then dropping trailing empty entries. The name is trimmed.
+ * Reproduces the single-line "Rename workspace" semantics: a non-empty name is
+ * written at the index, an empty name clears it. Returns a new array.
+ * @param {string[]} strv
+ * @param {number} index
+ * @param {string} name
+ * @returns {string[]}
+ */
+export function setNameAt(strv, index, name) {
+    const next = [...strv];
+    while (next.length <= index) next.push('');
+    next[index] = name.trim();
+
+    let end = next.length;
+    while (end > 0 && next[end - 1] === '') end--;
+    return next.slice(0, end);
+}
