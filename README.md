@@ -15,15 +15,18 @@ every workspace from a single editor.
   with proper text selection and cursor placement. The editor is single-instance: clicking again
   while it is open just brings the window back to the front.
 - **Right-click** opens a context menu: rename the current workspace, reset it, hide it (park it
-  below the blank line instead of deleting it), or edit all names.
+  below the blank line instead of deleting it), edit all names, and toggle the two keyboard
+  shortcuts on or off.
 - **Parked names**: keep spare workspace names below a blank line in the editor. GNOME only shows
   the active ones; the rest wait there, ready to be moved back up. As you add or remove workspaces,
   the extension keeps the parked block past the panel automatically, so a parked name never leaks
   into view.
 - **Sort hidden**: alphabetically reorders the parked names, ignoring a leading emoji/bullet prefix,
   with natural numeric ordering — the active names and the blank-line separator are left untouched.
-- **Keyboard shortcut**: because the editor runs as a standalone program, you can bind a shortcut
-  (e.g. <kbd>Super</kbd>+<kbd>F3</kbd>) straight to it — see *Bind a shortcut* below.
+- **Keyboard shortcuts**: the extension registers <kbd>Super</kbd>+<kbd>F2</kbd> (rename the current
+  workspace, single-line) and <kbd>Super</kbd>+<kbd>F3</kbd> (edit all names). Both open the same
+  standalone editor as the panel, toggle on/off from the context menu, and can be reconfigured via
+  the schema keys — see *Keyboard shortcuts* below.
 
 Names are stored in the standard GNOME key `org.gnome.desktop.wm.preferences` → `workspace-names`,
 so they persist independently of the extension and interoperate with `gsettings` and your own
@@ -37,31 +40,25 @@ scripts.
 - Put a **blank line** after your active names; anything below it is "parked" and hidden from GNOME.
 - Click **Sort hidden** to alphabetize the parked block.
 
-## Bind a shortcut
+## Keyboard shortcuts
 
-The editor is a standalone single-instance program, so a custom GNOME shortcut can open the very
-same window the panel does (pressing it again just raises the open window). Point a custom keybinding
-at `gjs -m <installed>/editor.js`:
+The extension registers two keybindings itself (no manual `gsettings` wiring):
+
+- <kbd>Super</kbd>+<kbd>F2</kbd> — rename the **current** workspace (single-line entry).
+- <kbd>Super</kbd>+<kbd>F3</kbd> — **edit all** workspace names (multiline editor).
+
+Both launch the same single-instance editor as a left-click; pressing a shortcut again raises (or
+re-renders) the open window rather than opening a second one. Each shortcut has a toggle in the
+right-click context menu, and the accelerators live in the extension's own schema keys
+(`rename-shortcut`, `edit-all-shortcut`) if you want to reconfigure them, e.g.:
 
 ```bash
-gjs="$(command -v gjs)"
-editor="$HOME/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io/editor.js"
-
-schema=org.gnome.settings-daemon.plugins.media-keys
-key=/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/workspace-titles/
-
-# Add our keybinding without dropping any existing custom ones.
-existing="$(gsettings get $schema custom-keybindings)"
-case "$existing" in
-  *"$key"*) ;; # already listed
-  "@as []"|"[]") gsettings set $schema custom-keybindings "['$key']" ;;
-  *) gsettings set $schema custom-keybindings "${existing%]}, '$key']" ;;
-esac
-
-gsettings set $schema.custom-keybinding:$key name 'Edit workspace names'
-gsettings set $schema.custom-keybinding:$key command "$gjs -m $editor"
-gsettings set $schema.custom-keybinding:$key binding '<Super>F3'
+gsettings --schemadir ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io/schemas/ \
+  set org.gnome.shell.extensions.gnome-workspace-titles@mabhub rename-shortcut "['<Super>F2']"
 ```
+
+Because the extension owns these accelerators, remove any of your own custom keybindings bound to
+the same combinations (otherwise they conflict and the extension's binding is ignored).
 
 ## Install from source
 
