@@ -96,37 +96,30 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         // Enforce once at startup in case the count changed while disabled.
         this._enforceSeparatorMargin();
 
-        // update when extension settings change
-        this._settings.connect('changed', () => this._updateWorkspaceNumber());
-
         // update when WM workspace-names change (e.g. from rename script)
         this._wmSettingsSignal = this._wmSettings.connect('changed::workspace-names', () => this._updateWorkspaceNumber());
 
         // Register the editor keybindings and react to their on/off toggles.
-        this._registerShortcuts();
-        this._renameEnabledSignal = this._settings.connect(
-            'changed::rename-shortcut-enabled',
-            () => this._bindShortcut('rename-shortcut', () => this._openRenameCurrent())
-        );
-        this._editAllEnabledSignal = this._settings.connect(
-            'changed::edit-all-shortcut-enabled',
-            () => this._bindShortcut('edit-all-shortcut', () => this._openEditAllPopup())
-        );
+        this._enabledSignals = [];
+        for (const { key, run } of this._shortcutDefs()) {
+            this._bindShortcut(key, run);
+            this._enabledSignals.push(this._settings.connect(
+                `changed::${key}-enabled`,
+                () => this._bindShortcut(key, run)
+            ));
+        }
 
         console.debug("[GnomeWorkspaceTitlesExtension] Enabled");
     }
 
     disable() {
         // Clean up
-        Main.wm.removeKeybinding('rename-shortcut');
-        Main.wm.removeKeybinding('edit-all-shortcut');
-        if (this._renameEnabledSignal) {
-            this._settings.disconnect(this._renameEnabledSignal);
-            this._renameEnabledSignal = null;
-        }
-        if (this._editAllEnabledSignal) {
-            this._settings.disconnect(this._editAllEnabledSignal);
-            this._editAllEnabledSignal = null;
+        for (const { key } of this._shortcutDefs())
+            Main.wm.removeKeybinding(key);
+        if (this._enabledSignals) {
+            for (const id of this._enabledSignals)
+                this._settings.disconnect(id);
+            this._enabledSignals = null;
         }
 
         if (this._workspaceSignal) {
@@ -409,10 +402,15 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     /**
-     * Registers both editor keybindings according to their enabled flags.
+     * The editor keybindings: the settings key holding each accelerator and the
+     * action it runs. Single source of truth for registering, toggling and
+     * removing them.
+     * @returns {{key: string, run: () => void}[]}
      */
-    _registerShortcuts() {
-        this._bindShortcut('rename-shortcut', () => this._openRenameCurrent());
-        this._bindShortcut('edit-all-shortcut', () => this._openEditAllPopup());
+    _shortcutDefs() {
+        return [
+            { key: 'rename-shortcut', run: () => this._openRenameCurrent() },
+            { key: 'edit-all-shortcut', run: () => this._openEditAllPopup() },
+        ];
     }
 }
