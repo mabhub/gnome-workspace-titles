@@ -10,11 +10,11 @@
  * @param {string} text
  * @returns {string[]}
  */
-export function parseEditorText(text) {
+export const parseEditorText = text => {
     const names = text.split('\n').map(l => l.replace(/\s+$/, ''));
     while (names.length && names[names.length - 1] === '') names.pop();
     return names;
-}
+};
 
 /**
  * Derives the sort key for a hidden name: strips any leading non-alphanumeric
@@ -23,10 +23,10 @@ export function parseEditorText(text) {
  * @param {string} name
  * @returns {string}
  */
-export function sortKey(name) {
+export const sortKey = name => {
     const stripped = name.replace(/^[^\p{L}\p{N}]+\s*/u, '');
     return stripped || name;
-}
+};
 
 /**
  * Comparator that orders hidden names by their sort key (decorative prefix
@@ -75,12 +75,12 @@ const isBlankItem = item => item === '';
  * @param {string} text
  * @returns {string}
  */
-export function sortHiddenNames(text) {
+export const sortHiddenNames = text => {
     const { active, separator, hidden, frontier } = splitHidden(text.split('\n'), isBlankLine);
     if (frontier === -1) return text; // no separator → nothing hidden
 
     return [...active, ...separator, ...hidden.toSorted(byHiddenOrder)].join('\n');
-}
+};
 
 /**
  * Moves the active name at `index` into the hidden block (the entries after the
@@ -92,7 +92,7 @@ export function sortHiddenNames(text) {
  * @param {number} index
  * @returns {string[]}
  */
-export function hideName(strv, index) {
+export const hideName = (strv, index) => {
     if (index < 0 || index >= strv.length || strv[index] === '')
         return [...strv];
 
@@ -106,7 +106,7 @@ export function hideName(strv, index) {
     const head = frontier === -1 ? [...active, ''] : [...active, ...separator];
 
     return [...head, ...[...hidden, name].toSorted(byHiddenOrder)];
-}
+};
 
 /**
  * Guarantees the hidden block starts beyond the next-workspace slot, so a hidden
@@ -119,14 +119,14 @@ export function hideName(strv, index) {
  * @param {number} workspaceCount
  * @returns {string[]}
  */
-export function padSeparator(strv, workspaceCount) {
+export const padSeparator = (strv, workspaceCount) => {
     const { active, hidden, frontier } = splitHidden(strv, isBlankItem);
     if (frontier === -1 || hidden.length === 0) return [...strv]; // nothing hidden
 
     const blanks = Math.max(workspaceCount + 1 - active.length, 1);
 
     return [...active, ...Array(blanks).fill(''), ...hidden];
-}
+};
 
 /**
  * Sets the workspace name at `index`, padding the array with '' when the index
@@ -138,7 +138,7 @@ export function padSeparator(strv, workspaceCount) {
  * @param {string} name
  * @returns {string[]}
  */
-export function setNameAt(strv, index, name) {
+export const setNameAt = (strv, index, name) => {
     const next = [...strv];
     while (next.length <= index) next.push('');
     next[index] = name.trim();
@@ -146,4 +146,4 @@ export function setNameAt(strv, index, name) {
     let end = next.length;
     while (end > 0 && next[end - 1] === '') end--;
     return next.slice(0, end);
-}
+};

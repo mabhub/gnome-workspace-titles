@@ -12,7 +12,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 
 // Local imports
 import { InputDialog } from './dialog.js';
-import { hideName, padSeparator } from './workspace-names.js';
+import { hideName, padSeparator, setNameAt } from './workspace-names.js';
 
 const WorkspaceIndicatorButton = GObject.registerClass(
 class WorkspaceIndicatorButton extends PanelMenu.Button {
@@ -161,23 +161,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     /**
-     * Sets the name for a specific workspace index, padding the array if needed.
-     * @param {number} index - Zero-based workspace index
-     * @param {string} newName
-     */
-    _setWorkspaceName(index, newName) {
-        const names = this._getWorkspaceNames();
-
-        // Ensure array is large enough
-        while (names.length <= index) {
-            names.push('');
-        }
-
-        names[index] = newName;
-        this._wmSettings.set_strv('workspace-names', names);
-    }
-
-    /**
      * Returns a copy of the array with trailing empty strings removed.
      * @param {string[]} names
      * @returns {string[]}
@@ -317,22 +300,15 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
         const dialog = new InputDialog('Rename workspace:', currentName);
 
         const result = await dialog.open();
+        if (result === null) return;
 
-        if (result !== null) {
-            const newName = result.text.trim();
-
-            if (newName) {
-                // Set the new name
-                this._setWorkspaceName(activeIndex, newName);
-            } else {
-                // Clear the name for current workspace
-                const currentNames = this._getWorkspaceNames();
-                if (currentNames[activeIndex]) {
-                    currentNames[activeIndex] = '';
-                    this._wmSettings.set_strv('workspace-names', currentNames);
-                }
-            }
-        }
+        // Re-read after the (awaited) dialog: workspace-names may have changed
+        // while it was open. setNameAt trims the name, pads up to the index and
+        // drops trailing empties — a non-empty name is written, an empty one
+        // clears it.
+        const current = this._getWorkspaceNames();
+        const next = setNameAt(current, activeIndex, result.text);
+        this._setNamesIfChanged(current, next);
     }
 
     /**
