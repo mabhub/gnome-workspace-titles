@@ -11,9 +11,9 @@
  * @returns {string[]}
  */
 export const parseEditorText = text => {
-    const names = text.split('\n').map(l => l.replace(/\s+$/, ''));
-    while (names.length && names[names.length - 1] === '') names.pop();
-    return names;
+  const names = text.split('\n').map(l => l.replace(/\s+$/, ''));
+  while (names.length && names[names.length - 1] === '') names.pop();
+  return names;
 };
 
 /**
@@ -24,8 +24,8 @@ export const parseEditorText = text => {
  * @returns {string}
  */
 export const sortKey = name => {
-    const stripped = name.replace(/^[^\p{L}\p{N}]+\s*/u, '');
-    return stripped || name;
+  const stripped = name.replace(/^[^\p{L}\p{N}]+\s*/u, '');
+  return stripped || name;
 };
 
 /**
@@ -36,7 +36,7 @@ export const sortKey = name => {
  * @returns {number}
  */
 const byHiddenOrder = (a, b) =>
-    sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true });
+  sortKey(a).localeCompare(sortKey(b), undefined, { sensitivity: 'base', numeric: true });
 
 /**
  * Splits a list around the first blank entry into its active block, the
@@ -49,19 +49,19 @@ const byHiddenOrder = (a, b) =>
  * @returns {{active: string[], separator: string[], hidden: string[], frontier: number}}
  */
 const splitHidden = (items, isBlank) => {
-    const frontier = items.findIndex(isBlank);
-    if (frontier === -1)
-        return { active: [...items], separator: [], hidden: [], frontier: -1 };
+  const frontier = items.findIndex(isBlank);
+  if (frontier === -1)
+    return { active: [...items], separator: [], hidden: [], frontier: -1 };
 
-    let firstHidden = frontier;
-    while (firstHidden < items.length && isBlank(items[firstHidden])) firstHidden++;
+  let firstHidden = frontier;
+  while (firstHidden < items.length && isBlank(items[firstHidden])) firstHidden++;
 
-    return {
-        active: items.slice(0, frontier),
-        separator: items.slice(frontier, firstHidden),
-        hidden: items.slice(firstHidden),
-        frontier,
-    };
+  return {
+    active: items.slice(0, frontier),
+    separator: items.slice(frontier, firstHidden),
+    hidden: items.slice(firstHidden),
+    frontier,
+  };
 };
 
 const isBlankLine = line => line.replace(/\s+$/, '') === '';
@@ -76,10 +76,10 @@ const isBlankItem = item => item === '';
  * @returns {string}
  */
 export const sortHiddenNames = text => {
-    const { active, separator, hidden, frontier } = splitHidden(text.split('\n'), isBlankLine);
-    if (frontier === -1) return text; // no separator → nothing hidden
+  const { active, separator, hidden, frontier } = splitHidden(text.split('\n'), isBlankLine);
+  if (frontier === -1) return text; // no separator → nothing hidden
 
-    return [...active, ...separator, ...hidden.toSorted(byHiddenOrder)].join('\n');
+  return [...active, ...separator, ...hidden.toSorted(byHiddenOrder)].join('\n');
 };
 
 /**
@@ -93,19 +93,19 @@ export const sortHiddenNames = text => {
  * @returns {string[]}
  */
 export const hideName = (strv, index) => {
-    if (index < 0 || index >= strv.length || strv[index] === '')
-        return [...strv];
+  if (index < 0 || index >= strv.length || strv[index] === '')
+    return [...strv];
 
-    const name = strv[index];
-    const next = strv.toSpliced(index, 1); // active zone shifts left
+  const name = strv[index];
+  const next = strv.toSpliced(index, 1); // active zone shifts left
 
-    const { active, separator, hidden, frontier } = splitHidden(next, isBlankItem);
+  const { active, separator, hidden, frontier } = splitHidden(next, isBlankItem);
 
-    // Keep a separator: reuse the existing blank run, or add one when nothing was
-    // hidden before (frontier === -1, so active holds the whole list).
-    const head = frontier === -1 ? [...active, ''] : [...active, ...separator];
+  // Keep a separator: reuse the existing blank run, or add one when nothing was
+  // hidden before (frontier === -1, so active holds the whole list).
+  const head = frontier === -1 ? [...active, ''] : [...active, ...separator];
 
-    return [...head, ...[...hidden, name].toSorted(byHiddenOrder)];
+  return [...head, ...[...hidden, name].toSorted(byHiddenOrder)];
 };
 
 /**
@@ -120,12 +120,12 @@ export const hideName = (strv, index) => {
  * @returns {string[]}
  */
 export const padSeparator = (strv, workspaceCount) => {
-    const { active, hidden, frontier } = splitHidden(strv, isBlankItem);
-    if (frontier === -1 || hidden.length === 0) return [...strv]; // nothing hidden
+  const { active, hidden, frontier } = splitHidden(strv, isBlankItem);
+  if (frontier === -1 || hidden.length === 0) return [...strv]; // nothing hidden
 
-    const blanks = Math.max(workspaceCount + 1 - active.length, 1);
+  const blanks = Math.max(workspaceCount + 1 - active.length, 1);
 
-    return [...active, ...Array(blanks).fill(''), ...hidden];
+  return [...active, ...Array(blanks).fill(''), ...hidden];
 };
 
 /**
@@ -139,11 +139,11 @@ export const padSeparator = (strv, workspaceCount) => {
  * @returns {string[]}
  */
 export const setNameAt = (strv, index, name) => {
-    const next = [...strv];
-    while (next.length <= index) next.push('');
-    next[index] = name.trim();
+  const next = [...strv];
+  while (next.length <= index) next.push('');
+  next[index] = name.trim();
 
-    let end = next.length;
-    while (end > 0 && next[end - 1] === '') end--;
-    return next.slice(0, end);
+  let end = next.length;
+  while (end > 0 && next[end - 1] === '') end--;
+  return next.slice(0, end);
 };
