@@ -3,8 +3,6 @@
 A GNOME Shell extension that shows the active workspace's name in the panel and lets you name
 every workspace from a single editor.
 
-![Screenshot](./.images/screenshot2.png)
-
 > Fork of [MahdadGhasemian/gnome-workspace-titles](https://github.com/MahdadGhasemian/gnome-workspace-titles),
 > rebranded under the `mabhub` namespace. Targets GNOME Shell 45 and 46.
 
