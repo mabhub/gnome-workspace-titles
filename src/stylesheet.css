@@ -20,3 +20,26 @@
 .rename-dialog .modal-dialog-content-box {
   spacing: 12px;
 }
+
+/* Panel names bar (workspace-bar.js). The pill is an independent background
+   actor positioned under the current label; the labels paint no background of
+   their own. Translucent neutral colors read on both light and dark panels. */
+
+.workspace-names-row {
+  spacing: 6px;
+}
+
+.workspace-name-label {
+  padding: 0 8px;
+  border-radius: 99px;
+  background-color: transparent;
+}
+
+.workspace-name-label:hover {
+  background-color: rgba(127, 127, 127, 0.15);
+}
+
+.workspace-pill {
+  border-radius: 99px;
+  background-color: rgba(127, 127, 127, 0.30);
+}
