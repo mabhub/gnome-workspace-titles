@@ -102,6 +102,12 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
       ));
     }
 
+    // Apply display-mode changes live (menu radio writes the key).
+    this._displayModeSignal = this._settings.connect('changed::display-mode', () => {
+      this._bar.setMode(this._settings.get_string('display-mode'));
+      this._refresh();
+    });
+
     console.debug("[GnomeWorkspaceTitlesExtension] Enabled");
   }
 
@@ -113,6 +119,11 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
       for (const id of this._enabledSignals)
         this._settings.disconnect(id);
       this._enabledSignals = null;
+    }
+
+    if (this._displayModeSignal) {
+      this._settings.disconnect(this._displayModeSignal);
+      this._displayModeSignal = null;
     }
 
     if (this._workspaceSignal) {
@@ -178,11 +189,39 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
   }
 
   /**
+   * Builds the "Display mode" radio submenu reflecting the current
+   * display-mode setting. Selecting an entry writes the key; the
+   * changed::display-mode handler then applies it live.
+   * @returns {PopupMenu.PopupSubMenuMenuItem}
+   */
+  _buildModeSubmenu() {
+    const current = this._settings.get_string('display-mode');
+    const submenu = new PopupMenu.PopupSubMenuMenuItem('Display mode');
+    const modes = [
+      { id: 'default', label: 'Default' },
+      { id: 'scroll', label: 'Scroll' },
+      { id: 'overview', label: 'Overview' },
+    ];
+    for (const { id, label } of modes) {
+      const item = new PopupMenu.PopupMenuItem(label);
+      item.setOrnament(id === current
+        ? PopupMenu.Ornament.DOT
+        : PopupMenu.Ornament.NONE);
+      item.connect('activate', () => this._settings.set_string('display-mode', id));
+      submenu.menu.addMenuItem(item);
+    }
+    return submenu;
+  }
+
+  /**
    * Clears and repopulates the context menu with current-state actions:
-   * rename, reset, hide, edit all.
+   * display mode, rename, reset, hide, edit all.
    */
   _rebuildContextMenu() {
     this._indicator.menu.removeAll();
+
+    this._indicator.menu.addMenuItem(this._buildModeSubmenu());
+    this._indicator.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
     const rename = new PopupMenu.PopupMenuItem('Rename workspace');
     rename.connect('activate', () => this._openRenamePopup());
