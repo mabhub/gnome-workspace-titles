@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
+  <enum id="org.gnome.shell.extensions.gnome-workspace-titles@mabhub.display-mode">
+    <value nick="default" value="0"/>
+    <value nick="scroll" value="1"/>
+    <value nick="overview" value="2"/>
+  </enum>
+
   <schema id="org.gnome.shell.extensions.gnome-workspace-titles@mabhub"
           path="/org/gnome/shell/extensions/gnome-workspace-titles/">
 
@@ -37,6 +43,18 @@
       <default>true</default>
       <summary>Enable the edit-all shortcut</summary>
       <description>When true, the edit-all-workspace-names keybinding is registered.</description>
+    </key>
+
+    <key name="display-mode" enum="org.gnome.shell.extensions.gnome-workspace-titles@mabhub.display-mode">
+      <default>'default'</default>
+      <summary>Panel display mode</summary>
+      <description>How workspace names are shown in the panel: 'default' (active only), 'scroll' (previous/current/next), or 'overview' (all names).</description>
+    </key>
+
+    <key name="overview-max-width" type="i">
+      <default>600</default>
+      <summary>Overview mode maximum width</summary>
+      <description>Maximum width in pixels of the names row in overview mode before it scrolls, keeping the current workspace centered.</description>
     </key>
 
   </schema>
