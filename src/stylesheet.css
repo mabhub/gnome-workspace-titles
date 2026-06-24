@@ -25,14 +25,32 @@
    actor positioned under the current label; the labels paint no background of
    their own. Translucent neutral colors read on both light and dark panels. */
 
+/* Suppress the panel button's own full-height hover/focus background: it stands
+   taller than the names and stacks with the pill (the "double pill" look). The
+   per-name hover below replaces it, matching the pill's height and shape. */
+.workspace-titles-button:hover,
+.workspace-titles-button:focus,
+.workspace-titles-button:active,
+.workspace-titles-button:checked {
+  background-color: transparent;
+  box-shadow: none;
+}
+
 .workspace-names-row {
   spacing: 6px;
 }
 
+/* Per-name hover: same rounded shape as the pill, hugging the name's height, so
+   hovering a name reads as "clickable" without imitating the current-workspace
+   pill (which is more opaque). */
 .workspace-name-label {
   padding: 0 8px;
   border-radius: 99px;
   background-color: transparent;
+}
+
+.workspace-name-label:hover {
+  background-color: rgba(127, 127, 127, 0.15);
 }
 
 .workspace-pill {

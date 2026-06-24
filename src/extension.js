@@ -22,26 +22,23 @@ class WorkspaceIndicatorButton extends PanelMenu.Button {
   _init(extension) {
     super._init(0.0, extension.metadata.name, false);
     this._ext = extension;
+    this.add_style_class_name('workspace-titles-button');
   }
 
   /**
-   * Dispatches pointer button events: left click opens the multiline editor
-   * for all workspace names, right click rebuilds and toggles the context menu.
-   * Middle click and other events are forwarded to the parent implementation.
+   * Dispatches pointer button events: right click rebuilds and toggles the
+   * context menu (the only way to reach the editor). Left clicks are handled by
+   * the name labels themselves (switch workspace); a left click on empty space
+   * does nothing. Other events are forwarded to the parent implementation.
    * @param {Clutter.Event} event
    * @returns {boolean} Clutter.EVENT_STOP or Clutter.EVENT_PROPAGATE
    */
   vfunc_event(event) {
-    if (event.type() === Clutter.EventType.BUTTON_PRESS) {
-      if (event.get_button() === Clutter.BUTTON_PRIMARY) {
-        this._ext._openEditAllPopup();
-        return Clutter.EVENT_STOP;
-      }
-      if (event.get_button() === Clutter.BUTTON_SECONDARY) {
-        this._ext._rebuildContextMenu();
-        this.menu.toggle();
-        return Clutter.EVENT_STOP;
-      }
+    if (event.type() === Clutter.EventType.BUTTON_PRESS
+      && event.get_button() === Clutter.BUTTON_SECONDARY) {
+      this._ext._rebuildContextMenu();
+      this.menu.toggle();
+      return Clutter.EVENT_STOP;
     }
     return super.vfunc_event(event);
   }
@@ -387,16 +384,14 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
   }
 
   /**
-   * Routes a click on a workspace name. Clicking the current workspace opens
-   * the editor (in every mode); clicking another switches to it.
+   * Routes a click on a workspace name: switch to that workspace. Clicking the
+   * current workspace does nothing (the editor is reached via the context menu
+   * or the Super+F3 shortcut, never via left click).
    * @param {number} index - The clicked workspace index
    */
   _onWorkspaceClicked(index) {
     const activeIndex = global.workspace_manager.get_active_workspace_index();
-    if (index === activeIndex) {
-      this._openEditAllPopup();
-      return;
-    }
+    if (index === activeIndex) return;
     this._activateWorkspace(index);
   }
 
