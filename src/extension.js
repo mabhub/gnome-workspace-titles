@@ -1,4 +1,3 @@
-import St from 'gi://St';
 import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
@@ -13,6 +12,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 // Local imports
 import { InputDialog } from './dialog.js';
 import { hideName, padSeparator, setNameAt } from './workspace-names.js';
+import { WorkspaceBar } from './workspace-bar.js';
 
 const WorkspaceIndicatorButton = GObject.registerClass(
 class WorkspaceIndicatorButton extends PanelMenu.Button {
@@ -58,46 +58,39 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     // Create a panel button
     this._indicator = new WorkspaceIndicatorButton(this);
 
-    // Create a horizontal box to hold icon + label
-    const box = new St.BoxLayout({ style_class: 'workspace-indicator-box', vertical: false });
-
-    // Label for workspace number
-    this._workspaceLabel = new St.Label({
-      text: '1',
-      y_align: Clutter.ActorAlign.CENTER,
-      style_class: 'workspace-number-label',
-    });
-    box.add_child(this._workspaceLabel);
-
-    // Add the box to the panel button
-    this._indicator.add_child(box);
+    // Names bar: pill + clickable labels, driven by the display mode.
+    this._bar = new WorkspaceBar();
+    this._bar.setMode(this._settings.get_string('display-mode'));
+    this._bar.setOverviewMaxWidth(this._settings.get_int('overview-max-width'));
+    this._bar.connect('workspace-clicked', (_b, index) => this._onWorkspaceClicked(index));
+    this._indicator.add_child(this._bar);
 
     // Add the indicator to the panel
     const panelBox = this._settings.get_string('panel-box');
     const panelPosition = this._settings.get_int('panel-position');
     Main.panel.addToStatusArea(this.uuid, this._indicator, panelPosition, panelBox);
 
-    // Update the label initially
-    this._updateWorkspaceNumber();
+    // Render the bar initially
+    this._refresh();
 
     // Connect signal to update on workspace change
     this._workspaceSignal = global.workspace_manager.connect(
       'active-workspace-changed',
-      () => this._updateWorkspaceNumber()
+      () => this._refresh()
     );
 
     // Keep the hidden block from leaking into the panel as workspaces come
     // and go (dynamic workspaces). notify::n-workspaces covers add + remove.
     this._nWorkspacesSignal = global.workspace_manager.connect(
       'notify::n-workspaces',
-      () => this._enforceSeparatorMargin()
+      () => { this._enforceSeparatorMargin(); this._refresh(); }
     );
 
     // Enforce once at startup in case the count changed while disabled.
     this._enforceSeparatorMargin();
 
     // update when WM workspace-names change (e.g. from rename script)
-    this._wmSettingsSignal = this._wmSettings.connect('changed::workspace-names', () => this._updateWorkspaceNumber());
+    this._wmSettingsSignal = this._wmSettings.connect('changed::workspace-names', () => this._refresh());
 
     // Register the editor keybindings and react to their on/off toggles.
     this._enabledSignals = [];
@@ -133,6 +126,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     if (this._indicator) {
+      this._bar = null; // destroyed as a child of the indicator below
       this._indicator.destroy();
       this._indicator = null;
     }
@@ -172,20 +166,15 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
   }
 
   /**
-   * Updates the panel label to show the active workspace name,
-   * or a fallback "Workspace N" if no name is set.
+   * Pushes the current state (names + active index + workspace count) to the
+   * names bar, which recomposes its labels and pill.
    */
-  _updateWorkspaceNumber() {
+  _refresh() {
+    if (!this._bar) return;
     const activeIndex = global.workspace_manager.get_active_workspace_index();
+    const nWorkspaces = global.workspace_manager.get_n_workspaces();
     const names = this._getWorkspaceNames();
-
-    let name = names[activeIndex]?.trim();
-    if (name) {
-      this._workspaceLabel.set_text(name);
-      return;
-    }
-
-    this._workspaceLabel.set_text(`Workspace ${activeIndex + 1}`);
+    this._bar.render(names, activeIndex, nWorkspaces);
   }
 
   /**
@@ -356,6 +345,30 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
   _openRenameCurrent() {
     const idx = global.workspace_manager.get_active_workspace_index();
     this._launchEditor(['--rename', String(idx)]);
+  }
+
+  /**
+   * Routes a click on a workspace name. Clicking the current workspace opens
+   * the editor (in every mode); clicking another switches to it.
+   * @param {number} index - The clicked workspace index
+   */
+  _onWorkspaceClicked(index) {
+    const activeIndex = global.workspace_manager.get_active_workspace_index();
+    if (index === activeIndex) {
+      this._openEditAllPopup();
+      return;
+    }
+    this._activateWorkspace(index);
+  }
+
+  /**
+   * Switches to the workspace at the given index.
+   * @param {number} index
+   */
+  _activateWorkspace(index) {
+    const wm = global.workspace_manager;
+    if (index < 0 || index >= wm.get_n_workspaces()) return;
+    wm.get_workspace_by_index(index).activate(global.get_current_time());
   }
 
   /**

@@ -85,7 +85,11 @@ export const WorkspaceBar = GObject.registerClass({
         reactive: true,
         track_hover: true,
       });
-      label.connect('button-press-event', () => {
+      label.connect('button-press-event', (_actor, event) => {
+        // Only the primary button acts on a name; let secondary/middle clicks
+        // propagate to the panel button's vfunc_event (context menu, etc.).
+        if (event.get_button() !== Clutter.BUTTON_PRIMARY)
+          return Clutter.EVENT_PROPAGATE;
         this.emit('workspace-clicked', index);
         return Clutter.EVENT_STOP;
       });
