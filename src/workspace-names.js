@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Mahdad Ghasemian and gnome-workspace-titles@mabhub contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 // Pure text helpers for the workspace-names list (no GNOME/GTK dependency,
 // unit-testable with a plain `node`). Shared between the extension
 // (extension.js) and the external editor process (editor.js) so the

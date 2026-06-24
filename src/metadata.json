@@ -5,5 +5,6 @@
   "shell-version": ["46", "45"],
   "url": "https://github.com/mabhub/gnome-workspace-titles",
   "settings-schema": "org.gnome.shell.extensions.gnome-workspace-titles@mabhub",
-  "version": 11
+  "version": 11,
+  "license": "GPL-2.0-or-later"
 }

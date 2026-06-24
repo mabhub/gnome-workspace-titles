@@ -107,3 +107,17 @@ cd ..
 ```bash
 journalctl -f -o cat /usr/bin/gnome-shell | grep GnomeWorkspaceTitlesExtension
 ```
+
+## License
+
+Licensed under the [GNU General Public License v2.0 or later](LICENSE) (GPL-2.0-or-later),
+consistent with GNOME Shell, which this extension links against.
+
+This is a fork of
+[MahdadGhasemian/gnome-workspace-titles](https://github.com/MahdadGhasemian/gnome-workspace-titles)
+(published on [GNOME Extensions](https://extensions.gnome.org/extension/8970/gnome-workspace-titles/)).
+The original carried no explicit license file; as a GNOME Shell extension it is necessarily a
+derivative work of GPL-licensed GNOME Shell, so this fork is distributed under GPL-2.0-or-later with
+attribution to the original author.
+
+Copyright © Mahdad Ghasemian (original) and contributors to this fork.

@@ -1,4 +1,7 @@
 #!/usr/bin/env -S gjs -m
+// SPDX-FileCopyrightText: Mahdad Ghasemian and gnome-workspace-titles@mabhub contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+//
 // Standalone, single-instance editor for the workspace-names list. It reads and
 // writes org.gnome.desktop.wm.preferences → workspace-names itself, and runs as
 // a single-instance Gtk.Application: launching it again raises (and, if needed,

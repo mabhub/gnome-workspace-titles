@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: Mahdad Ghasemian and gnome-workspace-titles@mabhub contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 // Pure selection logic: which workspace indices a given display mode shows in
 // the panel, in order. No GNOME/Shell dependency, so it is testable under a
 // plain `node` import (run the snippets in the project README/CLAUDE notes).
