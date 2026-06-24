@@ -35,10 +35,6 @@
   background-color: transparent;
 }
 
-.workspace-name-label:hover {
-  background-color: rgba(127, 127, 127, 0.15);
-}
-
 .workspace-pill {
   border-radius: 99px;
   background-color: rgba(127, 127, 127, 0.30);
