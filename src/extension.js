@@ -55,10 +55,12 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     // Create a panel button
     this._indicator = new WorkspaceIndicatorButton(this);
 
-    // Names bar: pill + clickable labels, driven by the display mode.
+    // Names bar: pill + clickable labels, driven by the display mode. Set the
+    // overview width before the mode so the first scroll-cap pass already has
+    // the real width (setMode applies the cap).
     this._bar = new WorkspaceBar();
-    this._bar.setMode(this._settings.get_string('display-mode'));
     this._bar.setOverviewMaxWidth(this._settings.get_int('overview-max-width'));
+    this._bar.setMode(this._settings.get_string('display-mode'));
     this._bar.connect('workspace-clicked', (_b, index) => this._onWorkspaceClicked(index));
     this._indicator.add_child(this._bar);
 
@@ -105,6 +107,12 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
       this._refresh();
     });
 
+    // Apply overview-max-width changes live too (only reachable via gsettings).
+    this._overviewWidthSignal = this._settings.connect('changed::overview-max-width', () => {
+      this._bar.setOverviewMaxWidth(this._settings.get_int('overview-max-width'));
+      this._refresh();
+    });
+
     console.debug("[GnomeWorkspaceTitlesExtension] Enabled");
   }
 
@@ -123,6 +131,11 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
       this._displayModeSignal = null;
     }
 
+    if (this._overviewWidthSignal) {
+      this._settings.disconnect(this._overviewWidthSignal);
+      this._overviewWidthSignal = null;
+    }
+
     if (this._workspaceSignal) {
       global.workspace_manager.disconnect(this._workspaceSignal);
       this._workspaceSignal = null;
@@ -134,6 +147,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     }
 
     if (this._indicator) {
+      this._bar?.stopAnimations(); // halt in-flight transitions before teardown
       this._bar = null; // destroyed as a child of the indicator below
       this._indicator.destroy();
       this._indicator = null;
@@ -336,12 +350,6 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     this._setNamesIfChanged(current, next);
   }
 
-  /**
-   * Launches the standalone editor (editor.js) for the full workspace-names
-   * list. The editor is a single-instance GTK app that reads and writes the
-   * names itself, so this is fire-and-forget: launching it again while its
-   * window is open just raises that window (GTK handles instance unicity).
-   */
   /**
    * Launches the standalone single-instance editor (editor.js), optionally
    * with extra arguments (e.g. ['--rename', '2']). Fire-and-forget: a second

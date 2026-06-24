@@ -5,6 +5,9 @@ import Pango from 'gi://Pango';
 
 import { visibleIndices } from './visible-indices.js';
 
+// Slide duration shared by the pill and the overview scroll, in milliseconds.
+const ANIM_MS = 200;
+
 /**
  * The background pill. A pure decoration positioned and sized manually under
  * the current label. It reports a zero preferred size so animating its width
@@ -86,6 +89,16 @@ export const WorkspaceBar = GObject.registerClass({
   }
 
   /**
+   * Stops any in-flight pill / scroll animations. Call before the widget is
+   * destroyed (extension disable) so a transition can't fire a callback into a
+   * half-torn-down actor — the "call back into JSAPI during GC" hazard.
+   */
+  stopAnimations() {
+    this._pill?.remove_all_transitions();
+    this._scroll?.get_hadjustment()?.remove_transition('value');
+  }
+
+  /**
    * Sets the display mode ('default' | 'scroll' | 'overview').
    * @param {string} mode
    */
@@ -96,6 +109,7 @@ export const WorkspaceBar = GObject.registerClass({
       this._scrollTarget = null;  // and re-center from scratch in overview
     }
     this._mode = mode;
+    this._applyScrollCap();
   }
 
   /**
@@ -104,6 +118,18 @@ export const WorkspaceBar = GObject.registerClass({
    */
   setOverviewMaxWidth(px) {
     this._overviewMaxWidth = px;
+    this._applyScrollCap();
+  }
+
+  /**
+   * Caps the scroll view width in overview (so it scrolls), and removes the cap
+   * in other modes (natural size, no scrollbar). Driven by mode/width changes
+   * rather than every render, since the value only changes there.
+   */
+  _applyScrollCap() {
+    this._scroll.set_style(this._mode === 'overview'
+      ? `max-width: ${this._overviewMaxWidth}px;`
+      : '');
   }
 
   /**
@@ -168,13 +194,6 @@ export const WorkspaceBar = GObject.registerClass({
       if (isCurrent) this._currentLabel = label;
     }
 
-    // Overview caps the width and scrolls to keep the current label centered;
-    // other modes size naturally with no scrolling.
-    if (this._mode === 'overview')
-      this._scroll.set_style(`max-width: ${this._overviewMaxWidth}px;`);
-    else
-      this._scroll.set_style('');
-
     // The pill is repositioned in vfunc_allocate, once the new labels are laid
     // out. A relayout is needed because we just changed the children.
     this.queue_relayout();
@@ -212,17 +231,18 @@ export const WorkspaceBar = GObject.registerClass({
     const maxValue = Math.max(0, adjustment.upper - pageSize);
     const target = Math.round(Math.max(0, Math.min(labelCenter - pageSize / 2, maxValue)));
 
-    if (Math.abs(adjustment.value - target) < 1) return;
-
     // Re-arm only when the target changes (vfunc_allocate fires repeatedly).
+    // Record it even when already at the target so the next equal render is a
+    // no-op too — keeps this guard and the value check in agreement.
     if (this._scrollTarget === target) return;
     this._scrollTarget = target;
+    if (Math.abs(adjustment.value - target) < 1) return;
 
     adjustment.remove_transition('value');
     if (this._shouldAnimatePill) {
       const t = new Clutter.PropertyTransition({
         property_name: 'value',
-        duration: 200,
+        duration: ANIM_MS,
         progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
       });
       t.set_from(adjustment.value);
@@ -265,6 +285,9 @@ export const WorkspaceBar = GObject.registerClass({
     const unchanged = prev
       && Math.abs(prev.x - target.x) < 1 && Math.abs(prev.y - target.y) < 1
       && Math.abs(prev.w - target.w) < 1 && Math.abs(prev.h - target.h) < 1;
+    // Skip only when the pill is already shown at this target. The `visible`
+    // check forces a (re)placement after the pill was hidden (no current
+    // label), even if the target happens to match the pre-hide one.
     if (this._pill.visible && unchanged) return;
 
     const wasVisible = this._pill.visible;
@@ -276,7 +299,7 @@ export const WorkspaceBar = GObject.registerClass({
       // Pill keeps its previous geometry; ease it toward the new label box.
       this._pill.ease({
         x: target.x, y: target.y, width: target.w, height: target.h,
-        duration: 200,
+        duration: ANIM_MS,
         mode: Clutter.AnimationMode.EASE_OUT_QUAD,
       });
     } else {
