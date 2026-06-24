@@ -43,10 +43,19 @@ export const WorkspaceBar = GObject.registerClass({
     this._mode = 'default';
     this._overviewMaxWidth = 600;
 
+    // The pill and the label row share one BinLayout (_content) so the pill
+    // stays glued to the labels when scrolled. A ScrollView only accepts a
+    // St.Scrollable child, and a plain St.Widget is not one, so _content is
+    // wrapped in a St.BoxLayout (which is scrollable) before going in.
+    this._content = new St.Widget({
+      layout_manager: new Clutter.BinLayout(),
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+
     // Background pill, rendered behind the row (added first). Its zero
-    // preferred size keeps it out of the parent's measurement.
+    // preferred size keeps it out of the content's measurement.
     this._pill = new Pill({ style_class: 'workspace-pill' });
-    this.add_child(this._pill);
+    this._content.add_child(this._pill);
 
     // Row of labels, on top.
     this._row = new St.BoxLayout({
@@ -54,7 +63,26 @@ export const WorkspaceBar = GObject.registerClass({
       vertical: false,
       y_align: Clutter.ActorAlign.CENTER,
     });
-    this.add_child(this._row);
+    this._content.add_child(this._row);
+
+    // Scrollable wrapper so the ScrollView accepts the content.
+    this._scrollable = new St.BoxLayout({
+      vertical: false,
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+    this._scrollable.add_child(this._content);
+
+    // The content lives in a scroll view; only overview caps its width and
+    // scrolls. Other modes let it size naturally (no scrollbar shows).
+    this._scroll = new St.ScrollView({
+      style_class: 'workspace-names-scroll',
+      hscrollbar_policy: St.PolicyType.EXTERNAL,
+      vscrollbar_policy: St.PolicyType.NEVER,
+      x_align: Clutter.ActorAlign.START,
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+    this._scroll.set_child(this._scrollable);
+    this.add_child(this._scroll);
   }
 
   /**
@@ -63,8 +91,9 @@ export const WorkspaceBar = GObject.registerClass({
    */
   setMode(mode) {
     if (mode !== this._mode) {
-      this._lastIndices = null; // force snap on mode change
-      this._pillTarget = null;  // forget the old target so the first place snaps
+      this._lastIndices = null;   // force snap on mode change
+      this._pillTarget = null;    // forget the old target so the first place snaps
+      this._scrollTarget = null;  // and re-center from scratch in overview
     }
     this._mode = mode;
   }
@@ -139,6 +168,13 @@ export const WorkspaceBar = GObject.registerClass({
       if (isCurrent) this._currentLabel = label;
     }
 
+    // Overview caps the width and scrolls to keep the current label centered;
+    // other modes size naturally with no scrolling.
+    if (this._mode === 'overview')
+      this._scroll.set_style(`max-width: ${this._overviewMaxWidth}px;`);
+    else
+      this._scroll.set_style('');
+
     // The pill is repositioned in vfunc_allocate, once the new labels are laid
     // out. A relayout is needed because we just changed the children.
     this.queue_relayout();
@@ -154,6 +190,47 @@ export const WorkspaceBar = GObject.registerClass({
   vfunc_allocate(box) {
     super.vfunc_allocate(box);
     this._allocatePill();
+    if (this._mode === 'overview') this._centerOnCurrent();
+  }
+
+  /**
+   * Scrolls the overview content so the current label is centered in the visible
+   * width. Animates the horizontal adjustment when the target moves; snaps the
+   * first time. St.Adjustment is a GObject (not an actor), so it has no ease()
+   * helper — animate its `value` with an explicit Clutter.PropertyTransition.
+   */
+  _centerOnCurrent() {
+    const label = this._currentLabel;
+    if (!label) return;
+
+    const adjustment = this._scroll.get_hadjustment();
+    if (!adjustment) return;
+
+    const lbox = label.get_allocation_box();
+    const labelCenter = (lbox.x1 + lbox.x2) / 2;
+    const pageSize = adjustment.page_size;
+    const maxValue = Math.max(0, adjustment.upper - pageSize);
+    const target = Math.round(Math.max(0, Math.min(labelCenter - pageSize / 2, maxValue)));
+
+    if (Math.abs(adjustment.value - target) < 1) return;
+
+    // Re-arm only when the target changes (vfunc_allocate fires repeatedly).
+    if (this._scrollTarget === target) return;
+    this._scrollTarget = target;
+
+    adjustment.remove_transition('value');
+    if (this._shouldAnimatePill) {
+      const t = new Clutter.PropertyTransition({
+        property_name: 'value',
+        duration: 200,
+        progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+      });
+      t.set_from(adjustment.value);
+      t.set_to(target);
+      adjustment.add_transition('value', t);
+    } else {
+      adjustment.value = target;
+    }
   }
 
   /**
