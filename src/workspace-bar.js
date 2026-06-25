@@ -58,9 +58,15 @@ export const WorkspaceBar = GObject.registerClass({
       y_align: Clutter.ActorAlign.CENTER,
     });
 
-    // Background pill, rendered behind the row (added first). Its zero
-    // preferred size keeps it out of the content's measurement.
+    // Background pill, rendered behind the row (added first). Its zero preferred
+    // size keeps it out of the content's measurement. We place it ourselves with
+    // set_position/set_size from vfunc_allocate, so it must opt out of the
+    // BinLayout via fixed position: otherwise the layout re-allocates it on every
+    // pass and overrides our geometry, leaving the pill mis-placed (centered and
+    // mis-sized) at startup / after resume from suspend until the next workspace
+    // switch happened to re-sync the timing.
     this._pill = new Pill({ style_class: 'workspace-pill' });
+    this._pill.set_fixed_position_set(true);
     this._content.add_child(this._pill);
 
     // Row of labels, on top.
