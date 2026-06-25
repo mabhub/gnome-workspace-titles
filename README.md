@@ -1,20 +1,27 @@
 # Gnome Workspace Titles
 
-A GNOME Shell extension that shows the active workspace's name in the panel and lets you name
-every workspace from a single editor.
+A GNOME Shell extension that shows workspace names in the panel, highlights the current one with an
+animated background pill, switches workspace on click, and lets you name every workspace from a
+single editor.
 
 > Fork of [MahdadGhasemian/gnome-workspace-titles](https://github.com/MahdadGhasemian/gnome-workspace-titles),
 > rebranded under the `mabhub` namespace. Targets GNOME Shell 45 and 46.
 
 ## Features
 
-- **Panel indicator** showing the active workspace's name (falls back to `Workspace N` when unnamed).
-- **Left-click** opens a native GTK editor window for the whole workspace list — one name per line,
-  with proper text selection and cursor placement. The editor is single-instance: clicking again
-  while it is open just brings the window back to the front.
-- **Right-click** opens a context menu: rename the current workspace, reset it, hide it (park it
-  below the blank line instead of deleting it), edit all names, and toggle the two keyboard
-  shortcuts on or off.
+- **Display modes** chosen from the right-click menu:
+  - *Default* — the current workspace's name only.
+  - *Scroll* — the previous / current / next names (the missing slot is simply absent at the edges).
+  - *Overview* — every workspace's name, scrolling to keep the current one centered.
+- **Current workspace highlight**: a rounded background pill sits behind the current name and slides
+  to follow it when you switch (in the animated modes). Names fall back to `Workspace N` when unnamed.
+- **Last workspace as `+`**: with dynamic workspaces GNOME always keeps one empty workspace at the
+  end; the panel labels it `+` (the "go here for a new workspace" slot) instead of its name.
+- **Left-click a name** to switch to that workspace. Clicking the current name does nothing; the
+  editor is no longer opened by a left-click (use the menu or a shortcut).
+- **Right-click** opens a context menu: pick the display mode, rename the current workspace, reset
+  it, hide it (park it below the blank line instead of deleting it), edit all names, and toggle the
+  two keyboard shortcuts on or off.
 - **Parked names**: keep spare workspace names below a blank line in the editor. GNOME only shows
   the active ones; the rest wait there, ready to be moved back up. As you add or remove workspaces,
   the extension keeps the parked block past the panel automatically, so a parked name never leaks
@@ -23,7 +30,7 @@ every workspace from a single editor.
   with natural numeric ordering — the active names and the blank-line separator are left untouched.
 - **Keyboard shortcuts**: the extension registers <kbd>Super</kbd>+<kbd>F2</kbd> (rename the current
   workspace, single-line) and <kbd>Super</kbd>+<kbd>F3</kbd> (edit all names). Both open the same
-  standalone editor as the panel, toggle on/off from the context menu, and can be reconfigured via
+  standalone editor as the context menu, toggle on/off from that menu, and can be reconfigured via
   the schema keys — see *Keyboard shortcuts* below.
 
 Names are stored in the standard GNOME key `org.gnome.desktop.wm.preferences` → `workspace-names`,
@@ -32,9 +39,11 @@ scripts.
 
 ## Usage
 
-- **Click** the indicator (left button) to open the all-names editor.
-- In the editor, press **Enter** for a new line; click **OK** to save, **Cancel** or **Esc** to
-  discard.
+- **Left-click** a name to switch to that workspace.
+- **Right-click** for the context menu: pick the **display mode**, rename/reset/hide the current
+  workspace, or open the all-names editor (**Edit all**).
+- Open the all-names editor from the menu or with <kbd>Super</kbd>+<kbd>F3</kbd>. In it, press
+  **Enter** for a new line; click **OK** to save, **Cancel** or **Esc** to discard.
 - Put a **blank line** after your active names; anything below it is "parked" and hidden from GNOME.
 - Click **Sort hidden** to alphabetize the parked block.
 
@@ -45,9 +54,9 @@ The extension registers two keybindings itself (no manual `gsettings` wiring):
 - <kbd>Super</kbd>+<kbd>F2</kbd> — rename the **current** workspace (single-line entry).
 - <kbd>Super</kbd>+<kbd>F3</kbd> — **edit all** workspace names (multiline editor).
 
-Both launch the same single-instance editor as a left-click; pressing a shortcut again raises (or
-re-renders) the open window rather than opening a second one. Each shortcut has a toggle in the
-right-click context menu, and the accelerators live in the extension's own schema keys
+Both launch the same single-instance editor as the **Edit all** menu entry; pressing a shortcut
+again raises (or re-renders) the open window rather than opening a second one. Each shortcut has a
+toggle in the right-click context menu, and the accelerators live in the extension's own schema keys
 (`rename-shortcut`, `edit-all-shortcut`) if you want to reconfigure them, e.g.:
 
 ```bash
