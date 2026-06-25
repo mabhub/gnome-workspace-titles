@@ -11,6 +11,11 @@ import { visibleIndices } from './visible-indices.js';
 // Slide duration shared by the pill and the overview scroll, in milliseconds.
 const ANIM_MS = 200;
 
+// With dynamic workspaces GNOME always keeps one empty workspace at the end (the
+// "go here to create the next one" slot). We label that last workspace with this
+// glyph instead of its name, in every mode and even when it is the active one.
+const LAST_WS_LABEL = '+';
+
 /**
  * The background pill. A pure decoration positioned and sized manually under
  * the current label. It reports a zero preferred size so animating its width
@@ -142,13 +147,16 @@ export const WorkspaceBar = GObject.registerClass({
   }
 
   /**
-   * Resolves the display name for an index: the trimmed stored name, or the
+   * Resolves the display name for an index: the "+" glyph for the last
+   * (always-empty, dynamic) workspace, else the trimmed stored name, else the
    * "Workspace N" fallback.
    * @param {string[]} names
    * @param {number} index
+   * @param {number} nWorkspaces - Total workspace count
    * @returns {string}
    */
-  _displayName(names, index) {
+  _displayName(names, index, nWorkspaces) {
+    if (index === nWorkspaces - 1) return LAST_WS_LABEL;
     return names[index]?.trim() || `Workspace ${index + 1}`;
   }
 
@@ -178,7 +186,7 @@ export const WorkspaceBar = GObject.registerClass({
     for (const index of indices) {
       const isCurrent = index === activeIndex;
       const label = new St.Label({
-        text: this._displayName(names, index),
+        text: this._displayName(names, index, nWorkspaces),
         style_class: 'workspace-name-label',
         y_align: Clutter.ActorAlign.CENTER,
         reactive: true,
