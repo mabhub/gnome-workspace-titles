@@ -1,7 +1,7 @@
 {
   "name": "Gnome Workspace Titles",
   "uuid": "gnome-workspace-titles@mabhub.github.io",
-  "description": "Set and display custom names for your GNOME workspaces. Click the panel indicator to edit all workspace names at once (one per line), keep spare names parked below a blank line, and sort them alphabetically.",
+  "description": "Set and display custom names for your GNOME workspaces. Choose a display mode (current name only, previous/current/next, or all names) from the right-click menu; left-click a name to switch to that workspace. Edit every name at once from the menu or with a shortcut (one per line), keep spare names parked below a blank line, and sort them alphabetically.",
   "shell-version": ["46", "45"],
   "url": "https://github.com/mabhub/gnome-workspace-titles",
   "settings-schema": "org.gnome.shell.extensions.gnome-workspace-titles@mabhub",
