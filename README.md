@@ -69,11 +69,16 @@ the same combinations (otherwise they conflict and the extension's binding is ig
 
 ## Install from source
 
-From the repository root:
+From the repository root. The `glib-compile-schemas` step is required: the compiled schema
+(`gschemas.compiled`) is a build artifact that is not checked in, and `gnome-extensions enable` does
+not compile it — without it the extension fails to load its settings. (The zip flow below compiles
+the schema for you; this manual flow does not.)
 
 ```bash
-mkdir -p ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io
-cp -r src/* ~/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io/
+EXT=~/.local/share/gnome-shell/extensions/gnome-workspace-titles@mabhub.github.io
+mkdir -p "$EXT"
+cp -r src/* "$EXT/"
+glib-compile-schemas "$EXT/schemas/"
 gnome-extensions enable gnome-workspace-titles@mabhub.github.io
 ```
 
