@@ -45,6 +45,18 @@
       <description>When true, the edit-all-workspace-names keybinding is registered.</description>
     </key>
 
+    <key name="hide-shortcut" type="as">
+      <default><![CDATA[['<Super>F4']]]></default>
+      <summary>Hide current workspace name shortcut</summary>
+      <description>Accelerator that moves the current workspace name into the sorted hidden block.</description>
+    </key>
+
+    <key name="hide-shortcut-enabled" type="b">
+      <default>true</default>
+      <summary>Enable the hide shortcut</summary>
+      <description>When true, the hide-current-workspace-name keybinding is registered.</description>
+    </key>
+
     <key name="display-mode" enum="org.gnome.shell.extensions.gnome-workspace-titles@mabhub.display-mode">
       <default>'default'</default>
       <summary>Panel display mode</summary>

@@ -276,6 +276,15 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
       this._settings.set_boolean('edit-all-shortcut-enabled', state)
     );
     this._indicator.menu.addMenuItem(editAllSwitch);
+
+    const hideSwitch = new PopupMenu.PopupSwitchMenuItem(
+      'Super+F4: hide current',
+      this._settings.get_boolean('hide-shortcut-enabled')
+    );
+    hideSwitch.connect('toggled', (_i, state) =>
+      this._settings.set_boolean('hide-shortcut-enabled', state)
+    );
+    this._indicator.menu.addMenuItem(hideSwitch);
   }
 
   /**
@@ -445,6 +454,7 @@ export default class GnomeWorkspaceTitlesExtension extends Extension {
     return [
       { key: 'rename-shortcut', run: () => this._openRenameCurrent() },
       { key: 'edit-all-shortcut', run: () => this._openEditAllPopup() },
+      { key: 'hide-shortcut', run: () => this._hideWorkspaceName() },
     ];
   }
 }
