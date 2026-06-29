@@ -27,7 +27,8 @@ single editor.
   the extension keeps the parked block past the panel automatically, so a parked name never leaks
   into view.
 - **Sort hidden**: alphabetically reorders the parked names, ignoring a leading emoji/bullet prefix,
-  with natural numeric ordering — the active names and the blank-line separator are left untouched.
+  with natural numeric ordering, and drops duplicate parked names (same text once trimmed, first kept)
+  — the active names and the blank-line separator are left untouched.
 - **Keyboard shortcuts**: the extension registers <kbd>Super</kbd>+<kbd>F2</kbd> (rename the current
   workspace, single-line) and <kbd>Super</kbd>+<kbd>F3</kbd> (edit all names). Both open the same
   standalone editor as the context menu, toggle on/off from that menu, and can be reconfigured via
@@ -46,7 +47,7 @@ scripts.
   **Enter** for a new line; click **OK** (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>) to save and close,
   <kbd>Ctrl</kbd>+<kbd>S</kbd> to save without closing, **Cancel** or **Esc** to discard.
 - Put a **blank line** after your active names; anything below it is "parked" and hidden from GNOME.
-- Click **Sort hidden** to alphabetize the parked block.
+- Click **Sort hidden** to alphabetize the parked block and remove duplicates from it.
 
 ## Keyboard shortcuts
 

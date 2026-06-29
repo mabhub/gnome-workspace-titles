@@ -71,10 +71,31 @@ const isBlankLine = line => line.replace(/\s+$/, '') === '';
 const isBlankItem = item => item === '';
 
 /**
+ * Drops duplicate entries from a hidden-block list, keeping the first occurrence
+ * of each name. Two entries are duplicates when their trimmed text is identical
+ * (decorative prefix and case still count; only edge whitespace is neutralised).
+ * Blank entries are left untouched (they carry no name to dedupe). Returns a new
+ * array preserving the original order.
+ * @param {string[]} names
+ * @returns {string[]}
+ */
+const dedupeHidden = names => {
+  const seen = new Set();
+  return names.filter(name => {
+    const key = name.trim();
+    if (key === '') return true; // keep blanks verbatim
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+/**
  * Reorders ONLY the hidden block (lines after the first blank line)
- * alphabetically, ignoring decorative prefixes. The active block and the
- * blank-line separator are preserved verbatim. No-op when there is no blank
- * line (i.e. nothing is hidden).
+ * alphabetically, ignoring decorative prefixes, and removes duplicate names
+ * (same trimmed text, first kept) from it. The active block and the blank-line
+ * separator are preserved verbatim. No-op when there is no blank line (i.e.
+ * nothing is hidden).
  * @param {string} text
  * @returns {string}
  */
@@ -82,7 +103,7 @@ export const sortHiddenNames = text => {
   const { active, separator, hidden, frontier } = splitHidden(text.split('\n'), isBlankLine);
   if (frontier === -1) return text; // no separator → nothing hidden
 
-  return [...active, ...separator, ...hidden.toSorted(byHiddenOrder)].join('\n');
+  return [...active, ...separator, ...dedupeHidden(hidden).toSorted(byHiddenOrder)].join('\n');
 };
 
 /**
