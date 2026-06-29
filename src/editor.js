@@ -60,7 +60,8 @@ const namesText = () => wmSettings.get_strv('workspace-names').join('\n');
 
 /**
  * Builds the multiline view: a TextView pre-filled with the whole list, a
- * HeaderBar with Cancel / Sort hidden / OK, Escape to cancel. OK writes the
+ * HeaderBar with Cancel / Sort hidden / OK. Escape cancels, Ctrl+Enter saves
+ * and closes (like OK), Ctrl+S saves in place without closing. OK writes the
  * parsed list back.
  * @returns {Gtk.ApplicationWindow}
  */
@@ -96,17 +97,31 @@ const buildMultilineView = () => {
   window.set_child(new Gtk.ScrolledWindow({ hexpand: true, vexpand: true, child: textView }));
 
   const getText = () => buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), false);
+  const save = () => wmSettings.set_strv('workspace-names', parseEditorText(getText()));
 
   sortBtn.connect('clicked', () => buffer.set_text(sortHiddenNames(getText()), -1));
-  okBtn.connect('clicked', () => {
-    wmSettings.set_strv('workspace-names', parseEditorText(getText()));
-    window.close();
-  });
+  okBtn.connect('clicked', () => { save(); window.close(); });
   cancelBtn.connect('clicked', () => window.close());
 
   const key = new Gtk.EventControllerKey();
-  key.connect('key-pressed', (_c, keyval) => {
+  // CAPTURE phase: the TextView consumes Return to insert a newline before a
+  // bubble-phase controller would ever see it, so Ctrl+Enter must be caught on
+  // the way down. We only swallow our own combos; everything else returns false
+  // and reaches the TextView untouched.
+  key.set_propagation_phase(Gtk.PropagationPhase.CAPTURE);
+  key.connect('key-pressed', (_c, keyval, _code, state) => {
     if (keyval === Gdk.KEY_Escape) { window.close(); return true; }
+    const ctrl = (state & Gdk.ModifierType.CONTROL_MASK) !== 0;
+    // Ctrl+Enter: save and close (like OK). Ctrl+S: save in place, stay open.
+    if (ctrl && (keyval === Gdk.KEY_Return || keyval === Gdk.KEY_KP_Enter)) {
+      save();
+      window.close();
+      return true;
+    }
+    if (ctrl && (keyval === Gdk.KEY_s || keyval === Gdk.KEY_S)) {
+      save();
+      return true;
+    }
     return false;
   });
   window.add_controller(key);

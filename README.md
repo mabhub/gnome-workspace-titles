@@ -43,7 +43,8 @@ scripts.
 - **Right-click** for the context menu: pick the **display mode**, rename/reset/hide the current
   workspace, or open the all-names editor (**Edit all**).
 - Open the all-names editor from the menu or with <kbd>Super</kbd>+<kbd>F3</kbd>. In it, press
-  **Enter** for a new line; click **OK** to save, **Cancel** or **Esc** to discard.
+  **Enter** for a new line; click **OK** (or <kbd>Ctrl</kbd>+<kbd>Enter</kbd>) to save and close,
+  <kbd>Ctrl</kbd>+<kbd>S</kbd> to save without closing, **Cancel** or **Esc** to discard.
 - Put a **blank line** after your active names; anything below it is "parked" and hidden from GNOME.
 - Click **Sort hidden** to alphabetize the parked block.
 
