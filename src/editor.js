@@ -94,6 +94,18 @@ const buildMultilineView = () => {
   const buffer = textView.get_buffer();
   buffer.set_text(namesText(), -1);
 
+  // Start the cursor at the end of the last active name (the line just before
+  // the first blank separator), the natural spot to edit/add active names. When
+  // there is no blank line (everything is active), leave it at the start.
+  const lines = namesText().split('\n');
+  const frontier = lines.indexOf('');
+  if (frontier > 0) {
+    // gjs returns [ok, iter] for get_iter_at_line (the iter is an out param).
+    const [, iter] = buffer.get_iter_at_line(frontier - 1);
+    iter.forward_to_line_end();
+    buffer.place_cursor(iter);
+  }
+
   window.set_child(new Gtk.ScrolledWindow({ hexpand: true, vexpand: true, child: textView }));
 
   const getText = () => buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), false);
