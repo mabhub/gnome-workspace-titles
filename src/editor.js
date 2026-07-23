@@ -24,6 +24,7 @@ import Gio from 'gi://Gio';
 import system from 'system';
 
 import { parseEditorText, sortHiddenNames, setNameAt } from './workspace-names.js';
+import { EDITOR_WIDTH, clampEditorHeight } from './editor-sizing.js';
 
 const wmSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.wm.preferences' });
 
@@ -58,14 +59,10 @@ const parseArgs = argv => {
  */
 const namesText = () => wmSettings.get_strv('workspace-names').join('\n');
 
-// Multiline window sizing. The width is fixed; the height follows the number of
-// lines to show, clamped between a floor and a share of the monitor height.
-const EDITOR_WIDTH = 460;
-const MIN_EDITOR_HEIGHT = 180;
-const MAX_EDITOR_HEIGHT_RATIO = 0.8;
-const FALLBACK_LINE_HEIGHT = 20; // used before the widget has a Pango context
-const EDITOR_CHROME_HEIGHT = 64; // header bar + the TextView's own margins
-const EDITOR_SLACK_LINES = 1; // blank line past the end, so the list reads as complete
+// Defensive only: a GTK widget always answers with a Pango layout, so this is
+// never expected to be used. It just keeps a broken measurement from producing
+// a zero-height window.
+const FALLBACK_LINE_HEIGHT = 20;
 
 /**
  * Measures one line of text as the widget's own font would render it, so the
@@ -81,23 +78,24 @@ const lineHeightOf = widget => {
 };
 
 /**
- * Height the multiline window should open at for a given line count, clamped
- * between MIN_EDITOR_HEIGHT and a share of the monitor the window sits on. One
- * extra blank line is budgeted past the last one, so the end of the list is
- * visibly the end rather than looking like it might continue below the edge.
- * @param {Gtk.Widget} widget - Widget used to measure the line height
+ * Collects the measurements clampEditorHeight needs, then defers the
+ * arithmetic to it.
+ *
+ * The monitor is a known approximation: the height must be decided before the
+ * window exists, but which monitor it lands on is the compositor's call and is
+ * only knowable once it has been mapped. Monitor 0 is therefore a guess, and on
+ * a multi-monitor setup whose displays differ in height it can be the wrong
+ * one -- a list sized for a tall monitor may overflow a shorter one. Resolving
+ * it properly means re-clamping from a `map` handler via
+ * get_monitor_at_surface(), at the cost of a visible resize on open.
+ * @param {Gtk.Widget} widget - Widget used to measure the line and find the monitor
  * @param {number} lineCount - Number of lines the editor starts with
  * @returns {number} Height in pixels
  */
 const editorHeightFor = (widget, lineCount) => {
   const monitor = widget.get_display()?.get_monitors()?.get_item(0);
   const monitorHeight = monitor?.get_geometry()?.height ?? 0;
-  const max = monitorHeight > 0
-    ? Math.round(monitorHeight * MAX_EDITOR_HEIGHT_RATIO)
-    : Number.MAX_SAFE_INTEGER;
-  const rows = lineCount + EDITOR_SLACK_LINES;
-  const wanted = rows * lineHeightOf(widget) + EDITOR_CHROME_HEIGHT;
-  return Math.min(Math.max(wanted, MIN_EDITOR_HEIGHT), Math.max(max, MIN_EDITOR_HEIGHT));
+  return clampEditorHeight(lineCount, lineHeightOf(widget), monitorHeight);
 };
 
 /**
@@ -132,13 +130,17 @@ const buildMultilineView = () => {
     left_margin: 8,
     right_margin: 8,
   });
+  // Read the key once: the buffer, the cursor position and the window height
+  // must all describe the same list, and the extension writes this same key
+  // from its own signal handlers.
+  const text = namesText();
   const buffer = textView.get_buffer();
-  buffer.set_text(namesText(), -1);
+  buffer.set_text(text, -1);
 
   // Start the cursor at the end of the last active name (the line just before
   // the first blank separator), the natural spot to edit/add active names. When
   // there is no blank line (everything is active), leave it at the start.
-  const lines = namesText().split('\n');
+  const lines = text.split('\n');
   const frontier = lines.indexOf('');
   if (frontier > 0) {
     // gjs returns [ok, iter] for get_iter_at_line (the iter is an out param).
