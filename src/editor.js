@@ -58,6 +58,48 @@ const parseArgs = argv => {
  */
 const namesText = () => wmSettings.get_strv('workspace-names').join('\n');
 
+// Multiline window sizing. The width is fixed; the height follows the number of
+// lines to show, clamped between a floor and a share of the monitor height.
+const EDITOR_WIDTH = 460;
+const MIN_EDITOR_HEIGHT = 180;
+const MAX_EDITOR_HEIGHT_RATIO = 0.8;
+const FALLBACK_LINE_HEIGHT = 20; // used before the widget has a Pango context
+const EDITOR_CHROME_HEIGHT = 64; // header bar + the TextView's own margins
+const EDITOR_SLACK_LINES = 1; // blank line past the end, so the list reads as complete
+
+/**
+ * Measures one line of text as the widget's own font would render it, so the
+ * sizing follows the system font instead of a hardcoded guess.
+ * @param {Gtk.Widget} widget - Widget whose Pango context provides the font
+ * @returns {number} Line height in pixels
+ */
+const lineHeightOf = widget => {
+  const layout = widget.create_pango_layout('Ag');
+  if (!layout) return FALLBACK_LINE_HEIGHT;
+  const [, height] = layout.get_pixel_size();
+  return height > 0 ? height : FALLBACK_LINE_HEIGHT;
+};
+
+/**
+ * Height the multiline window should open at for a given line count, clamped
+ * between MIN_EDITOR_HEIGHT and a share of the monitor the window sits on. One
+ * extra blank line is budgeted past the last one, so the end of the list is
+ * visibly the end rather than looking like it might continue below the edge.
+ * @param {Gtk.Widget} widget - Widget used to measure the line height
+ * @param {number} lineCount - Number of lines the editor starts with
+ * @returns {number} Height in pixels
+ */
+const editorHeightFor = (widget, lineCount) => {
+  const monitor = widget.get_display()?.get_monitors()?.get_item(0);
+  const monitorHeight = monitor?.get_geometry()?.height ?? 0;
+  const max = monitorHeight > 0
+    ? Math.round(monitorHeight * MAX_EDITOR_HEIGHT_RATIO)
+    : Number.MAX_SAFE_INTEGER;
+  const rows = lineCount + EDITOR_SLACK_LINES;
+  const wanted = rows * lineHeightOf(widget) + EDITOR_CHROME_HEIGHT;
+  return Math.min(Math.max(wanted, MIN_EDITOR_HEIGHT), Math.max(max, MIN_EDITOR_HEIGHT));
+};
+
 /**
  * Builds the multiline view: a TextView pre-filled with the whole list, a
  * HeaderBar with Cancel / Sort hidden / OK. Escape cancels, Ctrl+Enter saves
@@ -69,8 +111,7 @@ const buildMultilineView = () => {
   const window = new Gtk.ApplicationWindow({
     application: app,
     title: 'Edit workspace names',
-    default_width: 460,
-    default_height: 420,
+    default_width: EDITOR_WIDTH,
   });
 
   const header = new Gtk.HeaderBar();
@@ -107,6 +148,10 @@ const buildMultilineView = () => {
   }
 
   window.set_child(new Gtk.ScrolledWindow({ hexpand: true, vexpand: true, child: textView }));
+
+  // Open tall enough for the whole list, within bounds. Done after set_child so
+  // the TextView is in the widget tree and its font/display are resolvable.
+  window.set_default_size(EDITOR_WIDTH, editorHeightFor(textView, lines.length));
 
   const getText = () => buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), false);
   const save = () => wmSettings.set_strv('workspace-names', parseEditorText(getText()));
